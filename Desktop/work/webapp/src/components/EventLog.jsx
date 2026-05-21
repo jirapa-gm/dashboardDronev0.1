@@ -369,9 +369,15 @@ function DroneIntelTable({ droneStats, onDroneClick }) {
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
-export default function EventLog({ events, isLoading }) {
+export default function EventLog({ events, isLoading, currentPage, setCurrentPage, onSearch, defaultStartDate, defaultEndDate }) {
   const [selectedDroneId, setSelectedDroneId] = useState(null);
+  const [startDate, setStartDate] = useState(defaultStartDate ?? '');
+  const [endDate,   setEndDate]   = useState(defaultEndDate   ?? '');
   const droneStats = useMemo(() => buildDroneStats(events), [events]);
+
+  const handleSearch = () => {
+    if (onSearch) onSearch({ startDate, endDate });
+  };
 
   return (
     <>
@@ -380,6 +386,24 @@ export default function EventLog({ events, isLoading }) {
       )}
 
       <div className="flex-1 flex flex-col overflow-hidden bg-[#0a0a0a]">
+        {/* Date range search bar */}
+        <div className="flex-none border-b border-[#2a2a2a] bg-[#111] px-4 py-2.5 flex items-center gap-3 flex-wrap">
+          <span className="text-[9px] text-[#555] uppercase tracking-widest font-bold whitespace-nowrap">Date Range</span>
+          <div className="flex items-center gap-2 flex-wrap flex-1">
+            <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
+              className="bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg px-2.5 py-1 text-[11px] text-white outline-none focus:border-orange-500 transition-colors" />
+            <span className="text-[10px] text-[#444]">—</span>
+            <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)}
+              className="bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg px-2.5 py-1 text-[11px] text-white outline-none focus:border-orange-500 transition-colors" />
+            <button onClick={handleSearch} disabled={isLoading}
+              className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-[10px] font-bold transition-all disabled:opacity-40"
+              style={{ background: '#1a1a1a', border: '1px solid #3a3a3a', color: '#aaa' }}>
+              {isLoading
+                ? <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />Searching…</>
+                : <><SearchIcon className="w-3 h-3 text-orange-400" />Search</>}
+            </button>
+          </div>
+        </div>
         <Toolbar>
           <div className="flex items-center gap-2">
             <TableIcon className="w-4 h-4 text-orange-500" />

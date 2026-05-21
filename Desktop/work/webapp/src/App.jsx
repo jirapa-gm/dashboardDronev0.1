@@ -178,7 +178,7 @@ export default function App() {
       <main className="flex-1 flex flex-row overflow-hidden relative">
         <Sidebar events={events} isLoading={isLoading} onSearch={handleSearch}
                  defaultStartDate={defaultDates.startDate} defaultEndDate={defaultDates.endDate}
-                 visible={sidebarVisible} activeDetector={activeDetector} />
+                 visible={sidebarVisible && !showSummary && activeTab === 'analytics'} activeDetector={activeDetector} />
 
         {isMobile && sidebarVisible && (
           <div className="absolute inset-0 bg-black/50 z-30" onClick={() => setSidebarVisible(false)} />
@@ -191,7 +191,7 @@ export default function App() {
 
           {!showSummary && activeTab === 'analytics' && <AnalyticsDashboard events={events} isLoading={isLoading} />}
           {!showSummary && activeTab === 'tactical'  && <TacticalMapView    events={events} isLoading={isLoading} />}
-          {!showSummary && activeTab === 'log'       && <EventLog events={events} isLoading={isLoading} currentPage={currentPage} setCurrentPage={setCurrentPage} />}
+          {!showSummary && activeTab === 'log'       && <EventLog events={events} isLoading={isLoading} currentPage={currentPage} setCurrentPage={setCurrentPage} onSearch={handleSearch} defaultStartDate={defaultDates.startDate} defaultEndDate={defaultDates.endDate} />}
         </div>
       </main>
 

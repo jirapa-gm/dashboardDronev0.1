@@ -1,7 +1,6 @@
 import { useState, useMemo } from 'react';
-import StatsPanel from './StatsPanel';
 import { Collapsible, SectionHeader, Field } from '../shared/ui';
-import { FilterIcon, GridIcon, LayersIcon, SearchIcon } from '../shared/icons';
+import { FilterIcon, LayersIcon, SearchIcon } from '../shared/icons';
 import { GROUP_COLOR, MODEL_COLORS, THREAT_COLOR, DIR_LABELS } from '../shared/constants';
 import { getProtocolColor, buildModelDist, buildDirDist } from '../shared/helpers';
 import { mockGroupTree } from '../data/Mockdata';
@@ -450,7 +449,6 @@ export default function Sidebar({ events, isLoading, onSearch, defaultStartDate,
   const [selectedDet,   setSelectedDet] = useState('ALL');
   const [filtersOpen,   setFiltersOpen] = useState(true);
   const [treeOpen,      setTreeOpen]    = useState(true);
-  const [summaryOpen,   setSummaryOpen] = useState(true);
 
   const handleTreeChange = ({ group, subgroup, detector }) => {
     const g   = group;
@@ -490,13 +488,6 @@ export default function Sidebar({ events, isLoading, onSearch, defaultStartDate,
             <div className="py-1">
               <DetectorTree selectedGroup={selectedGroup} selectedSubgroup={selectedSG} selectedDetector={selectedDet} onChange={handleTreeChange} />
             </div>
-          </Collapsible>
-        </section>
-
-        <section className="border-b border-[#3a3a3a]">
-          <SectionHeader label="Summary" icon={<GridIcon />} isOpen={summaryOpen} onToggle={() => setSummaryOpen(v => !v)} />
-          <Collapsible isOpen={summaryOpen} maxH="300px">
-            <div className="p-4"><StatsPanel events={events} /></div>
           </Collapsible>
         </section>
 

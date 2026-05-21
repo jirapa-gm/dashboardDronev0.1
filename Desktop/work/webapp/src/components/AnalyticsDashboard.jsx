@@ -263,8 +263,6 @@ export default function AnalyticsDashboard({ events, isLoading }) {
       </Toolbar>
 
       <div ref={contentRef} className="p-4 flex flex-col gap-4">
-        <KpiStrip kpis={kpis} />
-
         <Card title="Hourly Distribution" icon={<ClockIcon />}>
           <HourlyChart events={filtered} />
         </Card>
