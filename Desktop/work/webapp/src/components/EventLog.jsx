@@ -168,106 +168,167 @@ function DetectionTimeline({ detections }) {
   );
 }
 
-// ── Drone history panel ────────────────────────────────────────────────────────
+// ── Drone detail modal ────────────────────────────────────────────────────────
 function DroneHistoryPanel({ droneId, allEvents, onClose }) {
   const detections = useMemo(() => {
     if (!droneId) return [];
-    const cutoff = Date.now() - 7 * 86400000;
-    return allEvents.filter(e => e.drone_id === droneId && new Date(e.datetime).getTime() >= cutoff)
+    return allEvents.filter(e => e.drone_id === droneId)
       .sort((a, b) => new Date(b.datetime) - new Date(a.datetime));
   }, [droneId, allEvents]);
 
   if (!droneId) return null;
-  const latest = detections[0];
-  const gc = latest?.group === 'GA' ? GA : GB;
-  const tc = THREAT_COLOR[latest?.threat] ?? '#888';
-  const avgHeight = detections.length ? Math.round(detections.reduce((s,d) => s + (d.height ?? 0), 0) / detections.length) : 0;
-  const maxHeight = detections.length ? Math.max(...detections.map(d => d.height ?? 0)) : 0;
+
+  const latest    = detections[0];
+  const gc        = latest?.group === 'GA' ? GA : GB;
+  const tc        = THREAT_COLOR[latest?.threat] ?? '#888';
+
+  // ── computed stats ──────────────────────────────────────────────────────────
+  const n         = detections.length;
+  const avgSpeed  = n ? parseFloat((detections.reduce((s,d) => s+(d.speed??0), 0)/n).toFixed(2)) : 0;
+  const maxSpeed  = n ? Math.max(...detections.map(d => d.speed ?? 0)) : 0;
+  const avgHeight = n ? Math.round(detections.reduce((s,d) => s+(d.height??0), 0)/n) : 0;
+  const maxHeight = n ? Math.max(...detections.map(d => d.height ?? 0)) : 0;
+  const avgDist   = n ? Math.round(detections.reduce((s,d) => s+(d.estimated_distance_m??0), 0)/n) : 0;
+  const minDist   = n ? Math.min(...detections.map(d => d.estimated_distance_m ?? 9999)) : 0;
+  const avgRssi   = n ? parseFloat((detections.reduce((s,d) => s+(d.rssi_dbm??0), 0)/n).toFixed(1)) : 0;
+  const avgSnr    = n ? parseFloat((detections.reduce((s,d) => s+(d.snr_db??0), 0)/n).toFixed(1)) : 0;
+  const sorted_t  = [...detections].sort((a,b) => new Date(a.datetime)-new Date(b.datetime));
+  const firstSeen = sorted_t[0]?.datetime ?? null;
+  const lastSeen  = latest?.datetime ?? null;
   const detectorIds = [...new Set(detections.map(d => d.detector_id))];
-  const totalMin = (() => {
-    if (detections.length < 2) return 0;
-    const t = detections.map(d => new Date(d.datetime).getTime()).sort((a,b)=>a-b);
-    return Math.round((t[t.length-1] - t[0]) / 60000);
-  })();
+  const uniqueFreqs = [...new Set(detections.map(d => d.freq).filter(Boolean))].sort().join(', ');
+  const protocols   = [...new Set(detections.map(d => d.protocol_name).filter(Boolean))].join(', ');
+  const directions  = [...new Set(detections.map(d => d.direction).filter(Boolean))];
+  const topDir      = directions.length === 1 ? directions[0] : (latest?.direction ?? dirLabel(latest?.aoa_degrees) ?? '—');
+  const hasGps      = latest?.has_gps;
+  const registered  = latest?.registered;
+
+  // ── field component ─────────────────────────────────────────────────────────
+  const F = ({ label, value, color, span }) => (
+    <div style={{
+      background:'#1a1a1a', border:'1px solid #262626', borderRadius:8,
+      padding:'9px 13px', gridColumn: span ? 'span 2' : undefined,
+    }}>
+      <div style={{ fontSize:7.5, color:'#4a4a4a', textTransform:'uppercase', letterSpacing:'0.13em', marginBottom:5, fontFamily:'monospace' }}>{label}</div>
+      <div style={{ fontSize:13, fontWeight:700, fontFamily:'monospace', color: color ?? '#c8c8c8', lineHeight:1.2 }}>{value ?? '—'}</div>
+    </div>
+  );
+
+  const Divider = ({ label }) => (
+    <div style={{ display:'flex', alignItems:'center', gap:8, margin:'2px 0' }}>
+      <div style={{ flex:1, height:1, background:'#222' }} />
+      <span style={{ fontSize:8, color:'#3a3a3a', textTransform:'uppercase', letterSpacing:'0.12em', fontFamily:'monospace' }}>{label}</span>
+      <div style={{ flex:1, height:1, background:'#222' }} />
+    </div>
+  );
 
   return (
-    <div className="fixed inset-0 z-[999] flex items-end justify-end bg-black/60 p-4" onClick={onClose}>
-      <div className="flex flex-col overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}
-           style={{ background: '#0d0d0d', border: '1px solid #2a2a2a', borderRadius: 16, width: 460, maxHeight: '90vh' }}>
+    <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/75"
+         onClick={onClose} style={{ backdropFilter:'blur(3px)' }}>
+      <div onClick={e => e.stopPropagation()}
+           style={{ background:'#131313', border:'1px solid #252525', borderRadius:16,
+                    width:420, maxWidth:'93vw', maxHeight:'92vh',
+                    display:'flex', flexDirection:'column',
+                    boxShadow:'0 40px 100px rgba(0,0,0,0.85)' }}>
 
-        <div className="flex items-center justify-between px-5 py-4 border-b flex-none" style={{ borderColor: '#1e1e1e', background: '#111' }}>
+        {/* ── Header ── */}
+        <div style={{ background:'#191919', borderBottom:'1px solid #252525', padding:'15px 18px',
+                      display:'flex', alignItems:'flex-start', justifyContent:'space-between', flexShrink:0, borderRadius:'16px 16px 0 0' }}>
           <div>
-            <div className="flex items-center gap-3">
-              <span className="text-lg font-mono font-bold" style={{ color: gc }}>{droneId}</span>
-              {latest && <span className="text-[9px] px-2 py-0.5 rounded font-bold" style={{ background:`${tc}18`, color:tc, border:`1px solid ${tc}40` }}>{latest.threat}</span>}
-              {latest && <span className="text-[8px] px-1.5 py-0.5 rounded-full font-bold" style={{ color: getProtocolColor(latest.protocol_name) }}>{latest.protocol_name}</span>}
+            <div style={{ display:'flex', alignItems:'center', gap:9, marginBottom:5 }}>
+              <span style={{ fontSize:21, fontWeight:800, fontFamily:'monospace', letterSpacing:'0.04em', color: gc }}>{droneId}</span>
+              {latest?.threat && (
+                <span style={{ fontSize:7.5, fontWeight:800, padding:'3px 9px', borderRadius:4,
+                               background:`${tc}1e`, color:tc, border:`1px solid ${tc}55`, letterSpacing:'0.1em' }}>
+                  {latest.threat} THREAT
+                </span>
+              )}
             </div>
-            <div className="text-[10px] text-[#555] mt-0.5">{latest?.model} · {detections.length} detections in last 7 days</div>
+            <div style={{ fontSize:10, color:'#555', fontFamily:'monospace' }}>{latest?.model ?? '—'}</div>
           </div>
-          <button onClick={onClose} className="text-[#555] hover:text-white text-lg p-1 font-bold">✕</button>
+          <button onClick={onClose} className="hover:text-white transition-colors"
+                  style={{ background:'none', border:'none', color:'#505050',
+                           fontSize:18, cursor:'pointer', lineHeight:1, padding:'2px 4px', marginTop:2 }}>✕</button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-5" style={{ minHeight: 0 }}>
-          <div className="grid grid-cols-2 gap-3">
-            {[['Drone ID',droneId],['Group',latest?.group??'—'],['Subgroup',latest?.subgroup??'—'],['Model',latest?.model??'—'],['Protocol',latest?.protocol_name??'—'],['Registered',latest?.registered?'🟢 Yes':'🔴 No']].map(([k,v]) => (
-              <div key={k} className="rounded-lg p-2.5" style={{ background: '#111', border: '1px solid #1e1e1e' }}>
-                <div className="text-[8px] text-[#444] uppercase tracking-widest mb-0.5">{k}</div>
-                <div className="text-[11px] font-mono text-[#ccc]">{v}</div>
-              </div>
-            ))}
+        {/* ── Body ── */}
+        <div style={{ padding:'14px 18px 10px', overflowY:'auto', display:'flex', flexDirection:'column', gap:8 }}>
+
+          {/* Identity */}
+          <Divider label="Identity" />
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:7 }}>
+            <F label="Detections"  value={n}              color="#ffffff" />
+            <F label="Group"       value={latest?.group}  color={gc} />
+            <F label="Subgroup"    value={latest?.subgroup} />
+            <F label="Registered"  value={registered == null ? '—' : registered ? '✓ Yes' : '✗ No'}
+               color={registered == null ? '#555' : registered ? '#34d399' : '#ef4444'} />
           </div>
 
-          <div className="rounded-lg p-3" style={{ background: '#111', border: '1px solid #1e1e1e' }}>
-            <div className="text-[8px] text-[#555] uppercase tracking-widest mb-2 font-bold">Detectors that saw this drone</div>
-            <div className="flex flex-wrap gap-2">
+          {/* Flight */}
+          <Divider label="Flight Data" />
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:7 }}>
+            <F label="Max Height"   value={`${maxHeight} m`} />
+            <F label="Avg Height"   value={`${avgHeight} m`} />
+            <F label="Max Speed"    value={`${maxSpeed} m/s`} />
+            <F label="Avg Speed"    value={`${avgSpeed} m/s`} />
+          </div>
+
+          {/* Signal */}
+          <Divider label="Signal" />
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:7 }}>
+            <F label="Avg RSSI"     value={`${avgRssi} dBm`} color="#a78bfa" />
+            <F label="Avg SNR"      value={`${avgSnr} dB`}   color="#a78bfa" />
+            <F label="Protocol"     value={protocols || '—'} />
+            <F label="Frequency"    value={uniqueFreqs ? `${uniqueFreqs} MHz` : '—'} />
+          </div>
+
+          {/* Detection */}
+          <Divider label="Detection" />
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:7 }}>
+            <F label="Direction"    value={topDir} />
+            <F label="Min Distance" value={minDist < 9999 ? `${minDist} m` : '—'} color="#f97316" />
+            <F label="Avg Distance" value={`${avgDist} m`} />
+            <F label="Has GPS"      value={hasGps == null ? '—' : hasGps ? '✓ Yes' : '✗ No'}
+               color={hasGps == null ? '#555' : hasGps ? '#34d399' : '#ef4444'} />
+          </div>
+
+          {/* Detectors */}
+          {detectorIds.length > 0 && <>
+            <Divider label="Detectors" />
+            <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
               {detectorIds.map(id => {
                 const cnt = detections.filter(d => d.detector_id === id).length;
                 return (
-                  <div key={id} className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold font-mono"
-                       style={{ background: 'rgba(59,130,246,0.12)', color: '#3b82f6', border: '1px solid rgba(59,130,246,0.3)' }}>
-                    📡 {id} <span className="opacity-70">×{cnt}</span>
+                  <div key={id} style={{ padding:'4px 10px', borderRadius:20, fontSize:10,
+                                         fontWeight:700, fontFamily:'monospace',
+                                         background:'rgba(59,130,246,0.10)', color:'#60a5fa',
+                                         border:'1px solid rgba(59,130,246,0.28)' }}>
+                    {id} <span style={{ opacity:0.6 }}>×{cnt}</span>
                   </div>
                 );
               })}
             </div>
+          </>}
+
+          {/* Timestamps */}
+          <Divider label="Timeline" />
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:7 }}>
+            <F label="First Seen" value={firstSeen ? formatDate(firstSeen) : '—'} color="#888" />
+            <F label="Last Seen"  value={lastSeen  ? formatDate(lastSeen)  : '—'} color="#888" />
           </div>
 
-          <DetectionTimeline detections={detections} />
-
-          <div className="flex items-start gap-4">
-            <AltitudeGauge height={latest?.height} maxHeight={Math.max(maxHeight, 200)} />
-            <div className="flex-1 grid grid-cols-2 gap-2">
-              {[['Last seen',formatDate(latest?.datetime)],['Total time',totalMin>0?`${totalMin} min`:'< 1 min'],['Avg height',`${avgHeight} m`],['Max height',`${maxHeight} m`],['Bearing',latest?.bearing!=null?`${latest.bearing}°`:'—'],['Direction',latest?.direction??dirLabel(latest?.aoa_degrees)],['RSSI',`${latest?.rssi_dbm??'—'} dBm`],['SNR',`${latest?.snr_db??'—'} dB`]].map(([k,v]) => (
-                <div key={k} className="rounded-lg p-2.5" style={{ background:'#111', border:'1px solid #1e1e1e' }}>
-                  <div className="text-[8px] text-[#444] uppercase tracking-widest mb-0.5">{k}</div>
-                  <div className="text-[11px] font-mono text-[#ccc]">{v}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <SignalSparkline detections={detections.slice().reverse()} width={380} />
-
-          <div style={{ background:'#0d0d0d', border:'1px solid #1e1e1e', borderRadius:8, overflow:'hidden' }}>
-            <div className="px-3 py-2 text-[8px] font-bold text-[#444] uppercase tracking-widest border-b" style={{ borderColor:'#1e1e1e' }}>
-              Detection Log ({detections.length})
-            </div>
-            <div className="overflow-y-auto" style={{ maxHeight: 200 }}>
-              {detections.map((d, i) => (
-                <div key={i} className="flex items-center gap-3 px-3 py-2 border-b" style={{ borderColor:'#111' }}>
-                  <span className="text-[9px] font-mono text-[#444] w-28 flex-none">{formatDate(d.datetime)}</span>
-                  <span className="text-[9px] font-bold text-[#3b82f6] flex-none">{d.detector_id}</span>
-                  <span className="text-[9px] font-mono text-[#555] flex-none">{d.direction ?? '—'}</span>
-                  <span className="text-[9px] font-mono flex-none" style={{ color: distColor(d.estimated_distance_m) }}>{d.estimated_distance_m ?? '—'}m</span>
-                  <span className="text-[9px] font-mono text-[#444] flex-none">{d.height ?? '—'}m ↑</span>
-                </div>
-              ))}
-            </div>
-          </div>
+          <div style={{ height:4 }} />
         </div>
 
-        <div className="px-5 pb-4 pt-2 flex-none">
-          <button onClick={onClose} className="w-full py-2 rounded-lg text-[11px] font-bold text-white" style={{ background:'#1e1e1e', border:'1px solid #3a3a3a' }}>Close</button>
+        {/* ── Footer ── */}
+        <div style={{ padding:'0 18px 16px', flexShrink:0 }}>
+          <button onClick={onClose} className="hover:bg-[#2c2c2c] hover:text-white transition-colors"
+                  style={{ width:'100%', padding:'11px', borderRadius:8,
+                           background:'#1e1e1e', border:'1px solid #303030',
+                           color:'#999', fontSize:12, fontWeight:700,
+                           cursor:'pointer', letterSpacing:'0.05em', fontFamily:'monospace' }}>
+            Close
+          </button>
         </div>
       </div>
     </div>
