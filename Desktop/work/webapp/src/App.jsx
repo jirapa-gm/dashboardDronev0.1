@@ -78,7 +78,7 @@ function TabBar({ activeTab, setActiveTab, eventCount }) {
   );
 }
 
-// ── Breadcrumb bar (shown when a group/subgroup/detector is selected) ─────────
+// ── Breadcrumb bar (shown inside analytics content area when drilling down) ───
 function Breadcrumb({ activeGroup, activeSubgroup, activeDetector, onReset, onResetToGroup }) {
   const showDetector = activeDetector !== 'ALL';
   const showSubgroup = !showDetector && activeSubgroup !== 'ALL';
@@ -154,8 +154,8 @@ export default function App() {
     search({ startDate: params.startDate, endDate: params.endDate, group: g, subgroup: sg, detector: det });
   }, [search]);
 
-  const resetAll      = () => { setActiveDetector('ALL'); setActiveSubgroup('ALL'); setActiveGroup('ALL'); };
-  const resetToGroup  = () => { setActiveDetector('ALL'); setActiveSubgroup('ALL'); };
+  const resetAll     = () => { setActiveDetector('ALL'); setActiveSubgroup('ALL'); setActiveGroup('ALL'); };
+  const resetToGroup = () => { setActiveDetector('ALL'); setActiveSubgroup('ALL'); };
 
   const showDetector = activeDetector !== 'ALL';
   const showSubgroup = !showDetector && activeSubgroup !== 'ALL';
@@ -170,32 +170,49 @@ export default function App() {
       <Navbar isMockMode={isMockMode} setIsMockMode={setIsMockMode}
               sidebarVisible={sidebarVisible} setSidebarVisible={setSidebarVisible} />
 
-      {showSummary
-        ? <Breadcrumb activeGroup={activeGroup} activeSubgroup={activeSubgroup} activeDetector={activeDetector}
-                      onReset={resetAll} onResetToGroup={resetToGroup} />
-        : <TabBar activeTab={activeTab} setActiveTab={setActiveTab} eventCount={events.length} />}
+      {/* TabBar is always visible — no longer replaced by Breadcrumb */}
+      <TabBar activeTab={activeTab} setActiveTab={setActiveTab} eventCount={events.length} />
 
       <main className="flex-1 flex flex-row overflow-hidden relative">
+
+        {/* Sidebar — always present on Analytics tab */}
         <Sidebar events={events} isLoading={isLoading} onSearch={handleSearch}
                  defaultStartDate={defaultDates.startDate} defaultEndDate={defaultDates.endDate}
-                 visible={sidebarVisible && !showSummary && activeTab === 'analytics'} activeDetector={activeDetector} />
+                 visible={sidebarVisible && activeTab === 'analytics'} activeDetector={activeDetector} />
 
-        {isMobile && sidebarVisible && (
+        {isMobile && sidebarVisible && activeTab === 'analytics' && (
           <div className="absolute inset-0 bg-black/50 z-30" onClick={() => setSidebarVisible(false)} />
         )}
 
         <div className="flex-1 overflow-hidden flex flex-col min-w-0">
-          {showGroup    && <GroupSummary    groupId={activeGroup}  events={events} />}
-          {showSubgroup && <SubgroupSummary groupId={activeGroup}  subgroupId={activeSubgroup} events={events} />}
-          {showDetector && <DetectorSummary detectorId={activeDetector} events={events} />}
 
-          {!showSummary && activeTab === 'analytics' && <AnalyticsDashboard events={events} isLoading={isLoading} />}
-          {!showSummary && activeTab === 'tactical'  && <TacticalMapView    events={events} isLoading={isLoading} />}
-          {!showSummary && activeTab === 'log'       && <EventLog events={events} isLoading={isLoading} currentPage={currentPage} setCurrentPage={setCurrentPage} onSearch={handleSearch} defaultStartDate={defaultDates.startDate} defaultEndDate={defaultDates.endDate} />}
+          {/* ── Analytics tab ── sidebar stays, breadcrumb lives inside content */}
+          {activeTab === 'analytics' && <>
+            {showSummary && (
+              <Breadcrumb
+                activeGroup={activeGroup} activeSubgroup={activeSubgroup} activeDetector={activeDetector}
+                onReset={resetAll} onResetToGroup={resetToGroup}
+              />
+            )}
+            {showGroup    && <GroupSummary    groupId={activeGroup} events={events} />}
+            {showSubgroup && <SubgroupSummary groupId={activeGroup} subgroupId={activeSubgroup} events={events} />}
+            {showDetector && <DetectorSummary detectorId={activeDetector} events={events} />}
+            {!showSummary && <AnalyticsDashboard events={events} isLoading={isLoading} />}
+          </>}
+
+          {activeTab === 'tactical' && <TacticalMapView events={events} isLoading={isLoading} />}
+          {activeTab === 'log'      && (
+            <EventLog
+              events={events} isLoading={isLoading}
+              currentPage={currentPage} setCurrentPage={setCurrentPage}
+              onSearch={handleSearch}
+              defaultStartDate={defaultDates.startDate} defaultEndDate={defaultDates.endDate}
+            />
+          )}
         </div>
       </main>
 
-      {isMobile && !sidebarVisible && <SwipeHint />}
+      {isMobile && !sidebarVisible && activeTab === 'analytics' && <SwipeHint />}
     </div>
   );
 }
