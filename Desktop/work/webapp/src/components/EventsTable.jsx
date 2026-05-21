@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import Pagination    from './Pagination';
 import TimelineChart from './TimelineChart';
-import { buildDailyMap, buildDistribution } from '../utils/chartUtils';
+import { buildDailyMap, buildDistribution, buildFreqBands } from '../utils/chartUtils';
 
 const PER_PAGE = 8;
 
@@ -19,7 +19,6 @@ const COLUMNS = [
   { key: 'freq',        label: 'Freq'     },
 ];
 
-// ── CSV export ────────────────────────────────────────────────────────────────
 function exportCSV(events) {
   const header = COLUMNS.map((c) => c.label).join(',');
   const rows   = events.map((e) =>
@@ -39,7 +38,6 @@ function exportCSV(events) {
   URL.revokeObjectURL(url);
 }
 
-// ── PDF export ────────────────────────────────────────────────────────────────
 function buildLineSVG(dailyMap, days) {
   if (!days.length) return '<text x="300" y="70" text-anchor="middle" font-size="11" fill="#aaa">No data</text>';
 
@@ -49,7 +47,8 @@ function buildLineSVG(dailyMap, days) {
 
   const gaVals = days.map((d) => dailyMap[d]?.GA || 0);
   const gbVals = days.map((d) => dailyMap[d]?.GB || 0);
-  const maxV   = Math.max(...gaVals, ...gbVals, 1);
+  const totVals = days.map((d) => (dailyMap[d]?.GA || 0) + (dailyMap[d]?.GB || 0));
+  const maxV   = Math.max(...totVals, 1);
 
   const xOf = (i) => PL + (n === 1 ? cW / 2 : (i / (n - 1)) * cW);
   const yOf = (v) => PT + cH - (v / maxV) * cH;
@@ -59,8 +58,7 @@ function buildLineSVG(dailyMap, days) {
     const v = Math.round((maxV / 4) * i);
     const y = yOf(v);
     return `
-      <line x1="${PL}" y1="${y.toFixed(1)}" x2="${W - PR}" y2="${y.toFixed(1)}"
-            stroke="#e5e7eb" stroke-width="1" stroke-dasharray="4,3"/>
+      <line x1="${PL}" y1="${y.toFixed(1)}" x2="${W - PR}" y2="${y.toFixed(1)}" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="4,3"/>
       <text x="${PL - 4}" y="${(y + 3.5).toFixed(1)}" text-anchor="end" font-size="9" fill="#9ca3af">${v}</text>`;
   }).join('');
 
@@ -69,24 +67,19 @@ function buildLineSVG(dailyMap, days) {
 
   const makeDots = (pts, vals, color, labelOffset) =>
     days.map((_, i) => {
-      const [cx, cy] = pts.split(' ')[i].split(',');
+      const tokens = pts.split(' ');
+      if (!tokens[i]) return '';
       const showLbl  = (i % step === 0 || i === n - 1) && vals[i] > 0;
       return `
-        <circle cx="${xOf(i).toFixed(1)}" cy="${yOf(vals[i]).toFixed(1)}" r="3.5"
-                fill="${color}" stroke="#fff" stroke-width="1.5"/>
-        ${showLbl ? `<text x="${xOf(i).toFixed(1)}" y="${(yOf(vals[i]) + labelOffset).toFixed(1)}"
-                          text-anchor="middle" font-size="8" font-weight="700" fill="${color}">${vals[i]}</text>` : ''}`;
+        <circle cx="${xOf(i).toFixed(1)}" cy="${yOf(vals[i]).toFixed(1)}" r="3.5" fill="${color}" stroke="#fff" stroke-width="1.5"/>
+        ${showLbl ? `<text x="${xOf(i).toFixed(1)}" y="${(yOf(vals[i]) + labelOffset).toFixed(1)}" text-anchor="middle" font-size="8" font-weight="700" fill="${color}">${vals[i]}</text>` : ''}`;
     }).join('');
 
   const xLabels = days.map((d, i) =>
-    (i % step === 0 || i === n - 1)
-      ? `<text x="${xOf(i).toFixed(1)}" y="${(PT + cH + 16).toFixed(1)}"
-               text-anchor="middle" font-size="9" fill="#6b7280">${d.slice(5)}</text>`
-      : '',
+    (i % step === 0 || i === n - 1) ? `<text x="${xOf(i).toFixed(1)}" y="${(PT + cH + 16).toFixed(1)}" text-anchor="middle" font-size="9" fill="#6b7280">${d.slice(5)}</text>` : '',
   ).join('');
 
-  const areaPath = (pts) =>
-    `M${xOf(0).toFixed(1)},${(PT + cH).toFixed(1)} L${pts} L${xOf(n - 1).toFixed(1)},${(PT + cH).toFixed(1)} Z`;
+  const areaPath = (pts) => `M${xOf(0).toFixed(1)},${(PT + cH).toFixed(1)} L${pts} L${xOf(n - 1).toFixed(1)},${(PT + cH).toFixed(1)} Z`;
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
     <defs>
@@ -106,8 +99,8 @@ function buildLineSVG(dailyMap, days) {
     <path d="${areaPath(gaPts)}" fill="url(#gag)"/>
     <polyline points="${gbPts}" fill="none" stroke="#eab308" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
     <polyline points="${gaPts}" fill="none" stroke="#f97316" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-    ${makeDots(gbPts, gbVals, '#eab308', 16)}
-    ${makeDots(gaPts, gaVals, '#f97316', -7)}
+    ${makeDots(gbPts, gbVals, '#eab308', 14)}
+    ${makeDots(gaPts, gaVals, '#f97316', -6)}
     ${xLabels}
   </svg>`;
 }
@@ -130,16 +123,14 @@ function exportPDF(events) {
   const days      = Object.keys(dailyMap).sort();
   const lineChart = buildLineSVG(dailyMap, days);
 
-  // Donut chart
   const R    = 44;
   const circ = 2 * Math.PI * R;
   const gaA  = circ * (ga / Math.max(total, 1));
   const gbA  = circ * (gb / Math.max(total, 1));
 
-  // Model bars
-  const models   = buildDistribution(events, 'model');
-  const maxMdl   = Math.max(...models.map(([, v]) => v), 1);
-  const ROW_H    = 20;
+  const models    = buildDistribution(events, 'model');
+  const maxMdl    = Math.max(...models.map(([, v]) => v), 1);
+  const ROW_H     = 20;
   const modelBars = models.slice(0, 7).map(([name, count], i) => {
     const bw = (count / maxMdl) * 190;
     const y  = i * (ROW_H + 4);
@@ -150,16 +141,16 @@ function exportPDF(events) {
   }).join('');
   const modelSvgH = Math.min(models.length, 7) * (ROW_H + 4);
 
-  // Freq table
-  const FREQ_COLORS = ['#f97316', '#eab308', '#22d3ee', '#a855f7', '#34d399', '#ec4899'];
-  const freqRows    = buildDistribution(events, 'freq').map(([hz, count], i) => {
-    const pct = ((count / total) * 100).toFixed(1);
+  const FREQ_COLORS = ['#38bdf8', '#a78bfa', '#34d399'];
+  const freqBands   = buildFreqBands(events);
+  const freqRows    = freqBands.map(({ band, count }, i) => {
+    const pct = total > 0 ? ((count / total) * 100).toFixed(1) : '0.0';
+    const color = FREQ_COLORS[i % FREQ_COLORS.length];
     return `<tr>
-      <td><span style="display:inline-block;width:8px;height:8px;border-radius:2px;
-                       background:${FREQ_COLORS[i % FREQ_COLORS.length]};margin-right:6px;vertical-align:middle"></span>${hz} MHz</td>
+      <td><span style="display:inline-block;width:8px;height:8px;border-radius:2px; background:${color};margin-right:6px;vertical-align:middle"></span>${band} MHz</td>
       <td>${count}</td><td>${pct}%</td>
       <td><div style="background:#f3f4f6;border-radius:3px;height:7px;width:120px;overflow:hidden">
-        <div style="height:100%;width:${pct}%;background:${FREQ_COLORS[i % FREQ_COLORS.length]};border-radius:3px"></div>
+        <div style="height:100%;width:${pct}%;background:${color};border-radius:3px"></div>
       </div></td>
     </tr>`;
   }).join('');
@@ -172,26 +163,20 @@ function exportPDF(events) {
 <style>
   @page { size:A4 portrait; margin:14mm 16mm; }
   *,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
-  body { font-family:'Segoe UI',Arial,sans-serif; font-size:10px; color:#1f2937; background:#fff;
-         -webkit-print-color-adjust:exact; print-color-adjust:exact; }
-  .hdr { display:flex; align-items:center; justify-content:space-between;
-         padding-bottom:10px; border-bottom:2px solid #f97316; margin-bottom:14px; }
+  body { font-family:'Segoe UI',Arial,sans-serif; font-size:10px; color:#1f2937; background:#fff; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  .hdr { display:flex; align-items:center; justify-content:space-between; padding-bottom:10px; border-bottom:2px solid #f97316; margin-bottom:14px; }
   .hdr-left { display:flex; align-items:center; gap:10px; }
-  .hdr-icon { width:36px; height:36px; border-radius:9px;
-              background:linear-gradient(135deg,#ea580c,#f97316);
-              display:flex; align-items:center; justify-content:center; font-size:18px; }
+  .hdr-icon { width:36px; height:36px; border-radius:9px; background:linear-gradient(135deg,#ea580c,#f97316); display:flex; align-items:center; justify-content:center; font-size:18px; }
   .hdr-title { font-size:20px; font-weight:800; color:#111; letter-spacing:-.02em; }
   .hdr-sub   { font-size:8.5px; color:#9ca3af; text-transform:uppercase; letter-spacing:.08em; margin-top:1px; }
   .hdr-right { text-align:right; }
   .hdr-right .lbl { font-size:8px; color:#9ca3af; text-transform:uppercase; letter-spacing:.08em; }
   .hdr-right .val { font-size:11px; color:#111; font-family:monospace; margin-top:1px; }
   .sec { margin-bottom:14px; }
-  .sec-title { font-size:8px; font-weight:700; color:#ea580c; text-transform:uppercase;
-               letter-spacing:.14em; margin-bottom:8px; display:flex; align-items:center; gap:6px; }
+  .sec-title { font-size:8px; font-weight:700; color:#ea580c; text-transform:uppercase; letter-spacing:.14em; margin-bottom:8px; display:flex; align-items:center; gap:6px; }
   .sec-title::after { content:''; flex:1; height:1px; background:#f3f4f6; }
   .kpi-row { display:grid; grid-template-columns:repeat(6,1fr); gap:8px; }
-  .kpi     { border:1px solid #f3f4f6; border-radius:8px; padding:10px 10px 8px;
-             border-top:2.5px solid #f97316; background:#fafafa; }
+  .kpi     { border:1px solid #f3f4f6; border-radius:8px; padding:10px 10px 8px; border-top:2.5px solid #f97316; background:#fafafa; }
   .kpi.y   { border-top-color:#eab308; } .kpi.g { border-top-color:#22c55e; }
   .kpi.b   { border-top-color:#3b82f6; } .kpi.p { border-top-color:#a855f7; }
   .kpi-v   { font-size:20px; font-weight:800; color:#111; line-height:1; font-family:monospace; }
@@ -211,12 +196,10 @@ function exportPDF(events) {
   .dl-dot  { width:10px; height:10px; border-radius:3px; flex-shrink:0; }
   .dl-name { font-size:9px; color:#6b7280; font-family:monospace; }
   .dl-val  { font-size:13px; font-weight:800; font-family:monospace; margin-left:auto; }
-  .dl-pct  { font-size:8px; color:#9ca3af; }
   .freq-tbl { border-collapse:collapse; width:100%; }
   .freq-tbl th { font-size:8px; color:#9ca3af; text-align:left; padding:4px 6px; border-bottom:1px solid #f3f4f6; }
   .freq-tbl td { font-size:9px; padding:3px 6px; border-bottom:1px solid #f9fafb; }
-  .ftr { margin-top:10px; padding-top:8px; border-top:1px solid #f3f4f6;
-         display:flex; justify-content:space-between; align-items:center; }
+  .ftr { margin-top:10px; padding-top:8px; border-top:1px solid #f3f4f6; display:flex; justify-content:space-between; align-items:center; }
   .ftr-txt  { font-size:8px; color:#d1d5db; text-transform:uppercase; letter-spacing:.06em; }
   .ftr-logo { font-size:11px; font-weight:800; color:#f97316; }
   @media print { body { background:#fff; } .sec { page-break-inside:avoid; } }
@@ -270,12 +253,8 @@ function exportPDF(events) {
       <div class="donut-wrap">
         <svg width="100" height="100" viewBox="0 0 100 100">
           <circle cx="50" cy="50" r="${R}" fill="none" stroke="#f3f4f6" stroke-width="15"/>
-          <circle cx="50" cy="50" r="${R}" fill="none" stroke="#eab308" stroke-width="15"
-                  stroke-dasharray="${gbA.toFixed(2)} ${(circ - gbA).toFixed(2)}"
-                  stroke-dashoffset="${(circ * 0.25).toFixed(2)}" opacity="0.85"/>
-          <circle cx="50" cy="50" r="${R}" fill="none" stroke="#f97316" stroke-width="15"
-                  stroke-dasharray="${gaA.toFixed(2)} ${(circ - gaA).toFixed(2)}"
-                  stroke-dashoffset="${(circ * 0.25 + gbA).toFixed(2)}" opacity="0.9"/>
+          <circle cx="50" cy="50" r="${R}" fill="none" stroke="#eab308" stroke-width="15" stroke-dasharray="${gbA.toFixed(2)} ${(circ - gbA).toFixed(2)}" stroke-dashoffset="${(circ * 0.25).toFixed(2)}" opacity="0.85"/>
+          <circle cx="50" cy="50" r="${R}" fill="none" stroke="#f97316" stroke-width="15" stroke-dasharray="${gaA.toFixed(2)} ${(circ - gaA).toFixed(2)}" stroke-dashoffset="${(circ * 0.25 + gbA).toFixed(2)}" opacity="0.9"/>
           <text x="50" y="46" text-anchor="middle" font-size="17" font-weight="800" fill="#111" font-family="monospace">${total}</text>
           <text x="50" y="59" text-anchor="middle" font-size="8" fill="#9ca3af" font-family="monospace">TOTAL</text>
         </svg>
@@ -288,15 +267,14 @@ function exportPDF(events) {
     <div class="card">
       <div class="card-title">Frequency Distribution</div>
       <table class="freq-tbl">
-        <thead><tr><th>Freq</th><th>Count</th><th>%</th><th>Bar</th></tr></thead>
+        <thead><tr><th>Freq Band</th><th>Count</th><th>%</th><th>Bar</th></tr></thead>
         <tbody>${freqRows}</tbody>
       </table>
     </div>
   </div>
   <div class="card">
     <div class="card-title">Drone Model Distribution <span class="card-sub">top ${Math.min(models.length, 7)}</span></div>
-    <svg xmlns="http://www.w3.org/2000/svg" width="680" height="${modelSvgH}"
-         viewBox="0 0 680 ${modelSvgH}" style="width:100%;height:${modelSvgH}px">
+    <svg xmlns="http://www.w3.org/2000/svg" width="680" height="${modelSvgH}" viewBox="0 0 680 ${modelSvgH}" style="width:100%;height:${modelSvgH}px">
       ${modelBars}
     </svg>
   </div>
@@ -319,7 +297,6 @@ function exportPDF(events) {
   }
 }
 
-// ── Main component ────────────────────────────────────────────────────────────
 export default function EventsTable({ events, isLoading, currentPage, setCurrentPage }) {
   const [tableCollapsed,    setTableCollapsed]    = useState(false);
   const [timelineCollapsed, setTimelineCollapsed] = useState(false);
@@ -329,16 +306,10 @@ export default function EventsTable({ events, isLoading, currentPage, setCurrent
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-[#0f0f0f]">
-
-      {/* Header */}
       <div className="px-4 py-3 border-b border-[#3a3a3a] flex items-center justify-between bg-[#1a1a1a] flex-none">
         <div className="flex items-center gap-3">
-          <button
-            onClick={() => setTableCollapsed((v) => !v)}
-            className="p-1 hover:bg-[#2a2a2a] rounded transition-colors text-[#666] hover:text-[#aaa]"
-          >
-            <svg className={`w-3 h-3 transition-transform ${tableCollapsed ? '-rotate-90' : ''}`}
-                 fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <button onClick={() => setTableCollapsed((v) => !v)} className="p-1 hover:bg-[#2a2a2a] rounded transition-colors text-[#666] hover:text-[#aaa] bg-transparent border-0">
+            <svg className={`w-3 h-3 transition-transform ${tableCollapsed ? '-rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7"/>
             </svg>
           </button>
@@ -349,13 +320,8 @@ export default function EventsTable({ events, isLoading, currentPage, setCurrent
         </div>
 
         <div className="flex gap-2">
-          <button
-            onClick={() => exportCSV(events)}
-            disabled={isLoading || !events.length}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold text-[#ccc] bg-[#232323] hover:bg-[#2e2e2e] border border-[#3d3d3d] hover:border-[#555] rounded-md transition-all active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 24 24"
-                 fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <button onClick={() => exportCSV(events)} disabled={isLoading || !events.length} className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold text-[#ccc] bg-[#232323] hover:bg-[#2e2e2e] border border-[#3d3d3d] hover:border-[#555] rounded-md transition-all active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed">
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
               <polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/>
               <line x1="16" y1="17" x2="8" y2="17"/>
@@ -363,13 +329,8 @@ export default function EventsTable({ events, isLoading, currentPage, setCurrent
             Export CSV
           </button>
 
-          <button
-            onClick={() => exportPDF(events)}
-            disabled={isLoading || !events.length}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold text-white bg-[#f97316] hover:bg-[#ea580c] rounded-md transition-all active:scale-95 shadow-lg shadow-orange-900/20 disabled:opacity-30 disabled:cursor-not-allowed"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 24 24"
-                 fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <button onClick={() => exportPDF(events)} disabled={isLoading || !events.length} className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold text-white bg-[#f97316] hover:bg-[#ea580c] rounded-md transition-all active:scale-95 shadow-lg shadow-orange-900/20 disabled:opacity-30 disabled:cursor-not-allowed border-0">
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
               <polyline points="14 2 14 8 20 8"/><line x1="9" y1="15" x2="15" y2="15"/>
             </svg>
@@ -378,7 +339,6 @@ export default function EventsTable({ events, isLoading, currentPage, setCurrent
         </div>
       </div>
 
-      {/* Scrollable body */}
       <div className="flex-1 overflow-auto">
         {!tableCollapsed && (
           <>
@@ -404,15 +364,9 @@ export default function EventsTable({ events, isLoading, currentPage, setCurrent
                   <tbody>
                     {slice.map((e, i) => (
                       <tr key={i} className="border-b border-[#181818] hover:bg-[#151515] transition-colors group">
-                        <td className="px-4 py-2 text-[11px] font-mono text-[#666] group-hover:text-gray-300 whitespace-nowrap">
-                          {e.datetime.replace('T', ' ')}
-                        </td>
+                        <td className="px-4 py-2 text-[11px] font-mono text-[#666] group-hover:text-gray-300 whitespace-nowrap">{e.datetime.replace('T', ' ')}</td>
                         <td className="px-4 py-2">
-                          <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
-                            e.group === 'GA'
-                              ? 'bg-orange-900/20 text-orange-400 border border-orange-900/30'
-                              : 'bg-yellow-900/20 text-yellow-400 border border-yellow-900/30'
-                          }`}>
+                          <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${ e.group === 'GA' ? 'bg-orange-900/20 text-orange-400 border border-orange-900/30' : 'bg-yellow-900/20 text-yellow-400 border border-yellow-900/30' }`}>
                             {e.group}
                           </span>
                         </td>
@@ -440,24 +394,13 @@ export default function EventsTable({ events, isLoading, currentPage, setCurrent
           </>
         )}
 
-        {/* Timeline section */}
         <div className="border-t border-[#3a3a3a]">
-          <button
-            onClick={() => setTimelineCollapsed((v) => !v)}
-            className="w-full flex items-center justify-between px-4 py-2.5 bg-[#1a1a1a] hover:bg-[#202020] transition-colors"
-          >
+          <button onClick={() => setTimelineCollapsed((v) => !v)} className="w-full flex items-center justify-between px-4 py-2.5 bg-[#1a1a1a] hover:bg-[#202020] transition-colors border-0">
             <div className="flex items-center gap-2">
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 text-orange-500" viewBox="0 0 24 24"
-                   fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-              </svg>
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 text-orange-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
               <span className="text-[10px] font-bold text-[#888] uppercase tracking-widest">Daily Timeline</span>
             </div>
-            <svg className={`w-3 h-3 text-[#444] transition-transform duration-200 ${timelineCollapsed ? '-rotate-90' : ''}`}
-                 viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
-                 strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="6 9 12 15 18 9"/>
-            </svg>
+            <svg className={`w-3 h-3 text-[#444] transition-transform duration-200 ${timelineCollapsed ? '-rotate-90' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
           </button>
           {!timelineCollapsed && (
             <div className="p-4 bg-[#0f0f0f]">

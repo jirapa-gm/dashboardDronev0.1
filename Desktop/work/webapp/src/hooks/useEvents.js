@@ -1,7 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import mockData from '../data/Mockdata';
 
-
 const API_URL = import.meta.env.VITE_API_URL ?? '';
 
 export function useEvents(isMockMode) {
@@ -12,28 +11,30 @@ export function useEvents(isMockMode) {
   const isMockRef = useRef(isMockMode);
   useEffect(() => { isMockRef.current = isMockMode; }, [isMockMode]);
 
-  const search = useCallback(async ({ startDate, endDate, group }) => {
+  const search = useCallback(async ({ startDate, endDate, group, subgroup, detector }) => {
     setIsLoading(true);
     setCurrentPage(1);
 
-    // ── Mock mode ──────────────────────────────────────────────────────────
     if (isMockRef.current) {
-      await new Promise((res) => setTimeout(res, 400));
+      await new Promise((res) => setTimeout(res, 350));
       const filtered = mockData.filter((e) => {
         const d = e.datetime.split('T')[0];
-        return d >= startDate && d <= endDate && (group === 'ALL' || e.group === group);
+        if (d < startDate || d > endDate)              return false;
+        if (group && group !== 'ALL' && e.group !== group) return false;
+        if (subgroup && subgroup !== 'ALL' && e.subgroup !== subgroup) return false;
+        if (detector && detector !== 'ALL' && e.detector_id !== detector) return false;
+        return true;
       });
       setEvents(filtered);
       setIsLoading(false);
       return;
     }
 
-    // ── Live mode ──────────────────────────────────────────────────────────
     try {
       const res  = await fetch(API_URL, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ start: startDate, end: endDate, group }),
+        body:    JSON.stringify({ start: startDate, end: endDate, group, subgroup, detector }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();
@@ -44,7 +45,7 @@ export function useEvents(isMockMode) {
     } finally {
       setIsLoading(false);
     }
-  }, []); // stable — reads isMockMode via ref
+  }, []);
 
   return { events, isLoading, search, currentPage, setCurrentPage };
 }

@@ -1,0 +1,148 @@
+import { GA, GB } from './constants';
+import { ChevronIcon } from './icons';
+
+// ── Loading spinner ───────────────────────────────────────────────────────────
+export function Spinner({ label = '' }) {
+  return (
+    <div className="flex-1 flex items-center justify-center bg-[#0a0a0a]">
+      <div className="flex flex-col items-center gap-4">
+        <div className="w-8 h-8 border-2 border-[#2a2a2a] border-t-orange-500 rounded-full animate-spin" />
+        {label && <span className="text-[11px] text-[#555] uppercase tracking-widest">{label}</span>}
+      </div>
+    </div>
+  );
+}
+
+// ── Empty state ───────────────────────────────────────────────────────────────
+export function EmptyState({ icon = '📊', message = 'No data', sub = '' }) {
+  return (
+    <div className="flex-1 flex items-center justify-center bg-[#0f0f0f]">
+      <div className="text-center">
+        <div className="text-4xl mb-3">{icon}</div>
+        <div className="text-[#555] text-sm">{message}</div>
+        {sub && <div className="text-[#444] text-xs mt-1">{sub}</div>}
+      </div>
+    </div>
+  );
+}
+
+// ── Card container ────────────────────────────────────────────────────────────
+export function Card({ title, icon, children, className = '', action }) {
+  return (
+    <div className={`bg-[#141414] border border-[#2a2a2a] rounded-xl overflow-hidden ${className}`}>
+      <div className="flex items-center justify-between px-4 py-2.5 border-b border-[#222]">
+        <div className="flex items-center gap-2">
+          <span className="text-orange-500">{icon}</span>
+          <span className="text-[10px] font-bold text-[#666] uppercase tracking-widest">{title}</span>
+        </div>
+        {action}
+      </div>
+      <div className="p-3">{children}</div>
+    </div>
+  );
+}
+
+// ── Badge ─────────────────────────────────────────────────────────────────────
+export function Badge({ label, color, bg, border }) {
+  return (
+    <span className="text-[8px] px-1.5 py-0.5 rounded font-bold"
+          style={{ background: bg ?? `${color}22`, color, border: `1px solid ${border ?? color + '44'}` }}>
+      {label}
+    </span>
+  );
+}
+
+// ── Group filter tabs (ALL / GA / GB) ─────────────────────────────────────────
+export function GroupTabs({ value, onChange }) {
+  return (
+    <div className="flex gap-1.5">
+      {['ALL', 'GA', 'GB'].map(g => {
+        const c = g === 'GA' ? GA : g === 'GB' ? GB : '#aaa';
+        const active = value === g;
+        return (
+          <button key={g} onClick={() => onChange(g)}
+            className="text-[10px] px-3 py-1 rounded-full font-bold transition-all"
+            style={{ background: active ? `${c}22` : '#1e1e1e', border: `1px solid ${active ? c : '#3a3a3a'}`, color: active ? c : '#777' }}>
+            {g}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Toolbar wrapper ───────────────────────────────────────────────────────────
+export function Toolbar({ children }) {
+  return (
+    <div className="px-4 py-2.5 border-b border-[#2a2a2a] bg-[#111] flex items-center gap-3 flex-wrap flex-none sticky top-0 z-10">
+      {children}
+    </div>
+  );
+}
+
+// ── Collapsible section ───────────────────────────────────────────────────────
+export function Collapsible({ isOpen, maxH = '800px', children }) {
+  return (
+    <div style={{
+      maxHeight:  isOpen ? maxH : '0',
+      opacity:    isOpen ? 1 : 0,
+      overflow:   'hidden',
+      transition: 'max-height 0.22s ease, opacity 0.18s ease',
+    }}>
+      {children}
+    </div>
+  );
+}
+
+// ── Section header with collapse toggle ───────────────────────────────────────
+export function SectionHeader({ label, icon, isOpen, onToggle, count }) {
+  return (
+    <button onClick={onToggle}
+      className="w-full flex items-center justify-between px-4 py-3 hover:bg-[#202020] transition-colors group">
+      <div className="flex items-center gap-2 text-[11px] font-bold text-[#777] uppercase tracking-widest">
+        <span className="text-[#555] group-hover:text-[#777]">{icon}</span>
+        {label}
+        {count !== undefined && (
+          <span className="px-2 py-0.5 rounded text-[10px] font-bold" style={{ background: '#1a1a1a', color: '#666', border: '1px solid #333' }}>
+            {count}
+          </span>
+        )}
+      </div>
+      <ChevronIcon className={`w-3.5 h-3.5 text-[#444] transition-transform duration-200 ${isOpen ? '' : '-rotate-90'}`} />
+    </button>
+  );
+}
+
+// ── Form field label wrapper ──────────────────────────────────────────────────
+export function Field({ label, children }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label className="text-[11px] font-semibold text-[#999] uppercase tracking-wider">{label}</label>
+      {children}
+    </div>
+  );
+}
+
+// ── Horizontal bar chart row ──────────────────────────────────────────────────
+export function HBar({ data, colors, maxCount, total }) {
+  return (
+    <div className="flex flex-col gap-2">
+      {data.map(([label, count], i) => {
+        const pct   = ((count / maxCount) * 100).toFixed(1);
+        const share = ((count / total) * 100).toFixed(0);
+        const color = colors[i % colors.length];
+        return (
+          <div key={label}>
+            <div className="flex justify-between text-[9px] mb-1">
+              <span className="text-[#888] truncate max-w-[120px]">{label}</span>
+              <span className="font-mono font-bold" style={{ color }}>{count} <span className="text-[#444]">({share}%)</span></span>
+            </div>
+            <div className="h-1.5 rounded-full overflow-hidden" style={{ background: '#1e1e1e' }}>
+              <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: color }} />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
