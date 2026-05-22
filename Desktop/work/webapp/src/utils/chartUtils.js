@@ -86,15 +86,16 @@ export function buildDroneStats(events) {
 }
 
 export function buildKPIs(events) {
-  if (!events.length) return { total: 0, ga: 0, gb: 0, unique: 0, avgSpeed: '—', avgHeight: '—', maxSpeed: '—', highThreat: 0 };
-  const ga       = events.filter((e) => e.group === 'GA').length;
-  const gb       = events.filter((e) => e.group === 'GB').length;
-  const unique   = new Set(events.map((e) => e.drone_id)).size;
-  const avgSpeed = (events.reduce((s, e) => s + e.speed, 0) / events.length).toFixed(1);
-  const avgHeight= Math.round(events.reduce((s, e) => s + e.height, 0) / events.length);
-  const maxSpeed = Math.max(...events.map((e) => e.speed)).toFixed(1);
+  if (!events.length) return { total: 0, ga: 0, gb: 0, unique: 0, detectors: 0, avgSpeed: '—', avgHeight: '—', maxSpeed: '—', highThreat: 0 };
+  const ga        = events.filter((e) => e.group === 'GA').length;
+  const gb        = events.filter((e) => e.group === 'GB').length;
+  const unique    = new Set(events.map((e) => e.drone_id)).size;
+  const detectors = new Set(events.map((e) => e.detector_id).filter(Boolean)).size;
+  const avgSpeed  = (events.reduce((s, e) => s + e.speed, 0) / events.length).toFixed(1);
+  const avgHeight = Math.round(events.reduce((s, e) => s + e.height, 0) / events.length);
+  const maxSpeed  = Math.max(...events.map((e) => e.speed)).toFixed(1);
   const highThreat = events.filter((e) => e.threat === 'HIGH').length;
-  return { total: events.length, ga, gb, unique, avgSpeed, avgHeight, maxSpeed, highThreat };
+  return { total: events.length, ga, gb, unique, detectors, avgSpeed, avgHeight, maxSpeed, highThreat };
 }
 
 export function buildFreqBands(events) {
@@ -108,4 +109,3 @@ export function buildFreqBands(events) {
   });
   return Object.entries(bands).map(([band, count]) => ({ band, count }));
 }
-

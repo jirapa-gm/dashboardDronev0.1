@@ -149,6 +149,9 @@ function EmptyMsg({ label }) {
 
 // ── Breakdown table (shared by Group & Subgroup summaries) ────────────────────
 function BreakdownTable({ headers, rows, color }) {
+  const hasLatLon   = rows.length > 0 && rows[0].lat  !== undefined;
+  const hasDetCount = rows.length > 0 && rows[0].detectors !== undefined;
+
   return (
     <div className="bg-[#141414] border border-[#2a2a2a] rounded-xl overflow-hidden">
       <div className="overflow-x-auto">
@@ -157,26 +160,38 @@ function BreakdownTable({ headers, rows, color }) {
             <tr>{headers.map(h => <th key={h} className="px-4 py-2.5 text-[11px] font-bold text-[#666] uppercase whitespace-nowrap">{h}</th>)}</tr>
           </thead>
           <tbody>
-            {rows.map((row, i) => {
-              const share = row.share;
-              return (
-                <tr key={i} className="border-b border-[#111] hover:bg-[#0e0e0e] transition-colors">
-                  <td className="px-4 py-2.5"><span className="text-[12px] font-bold font-mono" style={{ color }}>{row.id}</span></td>
-                  {row.name !== undefined && <td className="px-4 py-2.5 text-[11px] text-[#666]">{row.name}</td>}
-                  <td className="px-4 py-2.5 text-[12px] font-mono text-[#bbb]">{row.count}</td>
-                  <td className="px-4 py-2.5 text-[12px] font-mono text-[#38bdf8]">{row.drones}</td>
-                  <td className="px-4 py-2.5">{row.highThreat>0?<span className="text-[11px] px-2 py-0.5 rounded font-bold" style={{ background:'#ef444418', color:'#ef4444' }}>{row.highThreat}</span>:<span className="text-[11px] text-[#444]">—</span>}</td>
+            {rows.map((row, i) => (
+              <tr key={i} className="border-b border-[#111] hover:bg-[#0e0e0e] transition-colors">
+                {/* ID */}
+                <td className="px-4 py-2.5"><span className="text-[12px] font-bold font-mono" style={{ color }}>{row.id}</span></td>
+                {/* Name (subgroup view has no name col) */}
+                {row.name !== undefined && <td className="px-4 py-2.5 text-[11px] text-[#666]">{row.name}</td>}
+                {/* Events */}
+                <td className="px-4 py-2.5 text-[12px] font-mono text-[#bbb]">{row.count}</td>
+                {/* Unique Drones */}
+                <td className="px-4 py-2.5 text-[12px] font-mono text-[#38bdf8]">{row.drones}</td>
+
+                {/* GroupSummary: Detectors count */}
+                {hasDetCount && (
                   <td className="px-4 py-2.5">
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 h-1.5 bg-[#222] rounded-full overflow-hidden" style={{ minWidth:60 }}>
-                        <div style={{ width:`${share}%`, background:color, height:'100%', borderRadius:4 }}/>
-                      </div>
-                      <span className="text-[11px] font-mono text-[#555]">{share}%</span>
-                    </div>
+                    <span className="text-[12px] font-bold font-mono" style={{ color:'#fb923c' }}>{row.detectors}</span>
                   </td>
-                </tr>
-              );
-            })}
+                )}
+
+                {/* SubgroupSummary: Latitude */}
+                {hasLatLon && (
+                  <td className="px-4 py-2.5 text-[12px] font-mono" style={{ color:'#34d399' }}>
+                    {row.lat != null ? Number(row.lat).toFixed(6) : '—'}
+                  </td>
+                )}
+                {/* SubgroupSummary: Longitude */}
+                {hasLatLon && (
+                  <td className="px-4 py-2.5 text-[12px] font-mono" style={{ color:'#34d399' }}>
+                    {row.lon != null ? Number(row.lon).toFixed(6) : '—'}
+                  </td>
+                )}
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
@@ -196,23 +211,23 @@ export function GroupSummary({ groupId, events }) {
     const map = {};
     grpEvents.forEach(e => {
       const k = e.subgroup ?? 'Unknown';
-      if (!map[k]) map[k] = { subgroup:k, count:0, drones:new Set(), highThreat:0 };
+      if (!map[k]) map[k] = { subgroup:k, count:0, drones:new Set(), detectors:new Set() };
       map[k].count++; map[k].drones.add(e.drone_id);
-      if (e.threat==='HIGH') map[k].highThreat++;
+      if (e.detector_id) map[k].detectors.add(e.detector_id);
     });
-    return Object.values(map).map(d => ({ ...d, drones:d.drones.size })).sort((a,b) => b.count-a.count);
+    return Object.values(map).map(d => ({ ...d, drones:d.drones.size, detectors:d.detectors.size })).sort((a,b) => b.count-a.count);
   }, [grpEvents]);
 
   if (!grpEvents.length) return <EmptyMsg label={`No events for group ${groupId}`}/>;
 
-  const rows = breakdown.map(sg => ({ id:sg.subgroup, count:sg.count, drones:sg.drones, highThreat:sg.highThreat, share:grpEvents.length?((sg.count/grpEvents.length)*100).toFixed(1):'0' }));
+  const rows = breakdown.map(sg => ({ id:sg.subgroup, count:sg.count, drones:sg.drones, detectors:sg.detectors, share:grpEvents.length?((sg.count/grpEvents.length)*100).toFixed(1):'0' }));
 
   return (
     <div className="flex-1 overflow-y-auto bg-[#0a0a0a]">
       <SummaryHeader icon={<div className="w-5 h-5 rounded-full flex-none" style={{ background:color }}/>} title={`Group ${groupId}`} badge={`${grpEvents.length} events`} badgeColor={color} subtitle={`${breakdown.length} subgroups`}/>
       <div className="p-5 flex flex-col gap-5">
         <KpiStrip kpis={kpis}/>
-        <BreakdownTable headers={['Subgroup','Events','Unique Drones','High Threat','Share']} rows={rows} color={color}/>
+        <BreakdownTable headers={['Subgroup','Events','Unique Drones','Detectors']} rows={rows} color={color}/>
         <ChartsRow modelDist={modelDist} dirDist={dirDist} color={color}/>
       </div>
     </div>
@@ -231,23 +246,25 @@ export function SubgroupSummary({ groupId, subgroupId, events }) {
     const map = {};
     sgEvents.forEach(e => {
       const k = e.detector_id ?? 'Unknown';
-      if (!map[k]) map[k] = { detector_id:k, detector_name:e.detector_name??'', count:0, drones:new Set(), highThreat:0 };
+      if (!map[k]) map[k] = { detector_id:k, detector_name:e.detector_name??'', count:0, drones:new Set(), lat:e.detector_lat??null, lon:e.detector_lon??null };
       map[k].count++; map[k].drones.add(e.drone_id);
-      if (e.threat==='HIGH') map[k].highThreat++;
+      // keep first non-null lat/lon found
+      if (map[k].lat == null && e.detector_lat != null) map[k].lat = e.detector_lat;
+      if (map[k].lon == null && e.detector_lon != null) map[k].lon = e.detector_lon;
     });
     return Object.values(map).map(d => ({ ...d, drones:d.drones.size })).sort((a,b) => b.count-a.count);
   }, [sgEvents]);
 
   if (!sgEvents.length) return <EmptyMsg label={`No events for subgroup ${subgroupId}`}/>;
 
-  const rows = breakdown.map(d => ({ id:d.detector_id, name:d.detector_name, count:d.count, drones:d.drones, highThreat:d.highThreat, share:sgEvents.length?((d.count/sgEvents.length)*100).toFixed(1):'0' }));
+  const rows = breakdown.map(d => ({ id:d.detector_id, name:d.detector_name, count:d.count, drones:d.drones, lat:d.lat, lon:d.lon, share:sgEvents.length?((d.count/sgEvents.length)*100).toFixed(1):'0' }));
 
   return (
     <div className="flex-1 overflow-y-auto bg-[#0a0a0a]">
       <SummaryHeader icon={<svg className="w-5 h-5 text-orange-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>} title={subgroupId} badge={`${sgEvents.length} events`} badgeColor={color} subtitle={`${breakdown.length} detectors`}/>
       <div className="p-5 flex flex-col gap-5">
         <KpiStrip kpis={kpis}/>
-        <BreakdownTable headers={['Detector ID','Name','Events','Unique Drones','High Threat','Share']} rows={rows} color={color}/>
+        <BreakdownTable headers={['Detector ID','Name','Events','Unique Drones','Latitude','Longitude']} rows={rows} color={color}/>
         <ChartsRow modelDist={modelDist} dirDist={dirDist} color={color}/>
       </div>
     </div>

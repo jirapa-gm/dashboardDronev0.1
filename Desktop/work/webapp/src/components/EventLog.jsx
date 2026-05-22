@@ -4,20 +4,32 @@ import { distColor, dirLabel, getProtocolColor, formatDate } from '../shared/hel
 import { SearchIcon, DownloadIcon, TableIcon } from '../shared/icons';
 import { Spinner, Toolbar } from '../shared/ui';
 
-// ── CSV export ────────────────────────────────────────────────────────────────
-function exportCSV(events) {
-  const headers = ['id','datetime','group','subgroup','detector_id','detector_name',
-    'drone_id','model','latitude','longitude','height','speed','freq','direction','bearing',
-    'protocol','protocol_name','threat','registered','has_gps','aoa_degrees',
-    'estimated_distance_m','rssi_dbm','snr_db','detector_lat','detector_lon'];
-  const rows = events.map(e => headers.map(h => {
-    const v = e[h];
-    if (v == null) return '';
-    return typeof v === 'string' ? `"${v.replace(/"/g, '""')}"` : v;
-  }).join(','));
+// ── CSV export (exports same aggregated droneStats as the table) ──────────────
+function exportCSV(droneStats) {
+  const headers = [
+    'drone_id','model','group','detections','threat',
+    'max_height_m','max_speed_ms','avg_speed_ms',
+    'protocols','frequencies','directions',
+    'first_seen','last_seen',
+  ];
+  const rows = droneStats.map(d => [
+    d.drone_id,
+    `"${(d.model ?? '').replace(/"/g,'""')}"`,
+    d.group,
+    d.detections,
+    d.threat,
+    d.maxHeight,
+    d.maxSpeed,
+    d.avgSpeed,
+    `"${d.protocols.join('; ')}"`,
+    `"${d.freqs.join('; ')}"`,
+    `"${d.directions.join(' ')}"`,
+    d.firstSeen,
+    d.lastSeen,
+  ].join(','));
   const blob = new Blob(['\uFEFF' + [headers.join(','), ...rows].join('\n')], { type: 'text/csv;charset=utf-8;' });
   const url  = URL.createObjectURL(blob);
-  Object.assign(document.createElement('a'), { href: url, download: `drone_log_${new Date().toISOString().split('T')[0]}.csv` }).click();
+  Object.assign(document.createElement('a'), { href: url, download: `drone_intel_${new Date().toISOString().split('T')[0]}.csv` }).click();
   URL.revokeObjectURL(url);
 }
 
@@ -356,7 +368,7 @@ function DroneIntelTable({ droneStats, onDroneClick }) {
   const slice = sorted.slice((page - 1) * PER, page * PER);
 
   const th = (key, label) => (
-    <th key={key} className="px-3 py-2 text-left text-[9px] font-bold text-[#666] uppercase tracking-wider cursor-pointer hover:text-[#aaa] whitespace-nowrap select-none"
+    <th key={key} className="px-3 py-2.5 text-left text-xs font-bold text-[#777] uppercase tracking-wider cursor-pointer hover:text-[#ccc] whitespace-nowrap select-none"
         onClick={() => { setSort(s => ({ key, dir: s.key === key ? -s.dir : -1 })); setPage(1); }}>
       {label} {sort.key === key ? (sort.dir === -1 ? '↓' : '↑') : ''}
     </th>
@@ -368,18 +380,18 @@ function DroneIntelTable({ droneStats, onDroneClick }) {
         <div className="relative flex-1 min-w-[160px]">
           <input type="text" placeholder="Search drone ID / model…" value={search}
             onChange={e => { setSearch(e.target.value); setPage(1); }}
-            className="w-full bg-[#141414] border border-[#3a3a3a] rounded-lg pl-8 pr-3 py-1.5 text-[11px] text-white outline-none focus:border-orange-500" />
-          <SearchIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-[#555]" />
+            className="w-full bg-[#141414] border border-[#3a3a3a] rounded-lg pl-8 pr-3 py-1.5 text-xs text-white outline-none focus:border-orange-500" />
+          <SearchIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-[#666]" />
         </div>
         {[['groupF', setGroupF, groupF, [['ALL','All Groups'],['GA','GA'],['GB','GB']]],
           ['threatF', setThreatF, threatF, [['ALL','All Threats'],['HIGH','HIGH'],['MEDIUM','MEDIUM'],['LOW','LOW']]]
         ].map(([, setter, val, opts]) => (
           <select key={val} value={val} onChange={e => { setter(e.target.value); setPage(1); }}
-            className="bg-[#111] border border-[#2a2a2a] rounded-lg px-2 py-1.5 text-[10px] text-white outline-none">
+            className="bg-[#111] border border-[#2a2a2a] rounded-lg px-2 py-1.5 text-xs text-white outline-none">
             {opts.map(([v,l]) => <option key={v} value={v}>{l}</option>)}
           </select>
         ))}
-        <span className="text-[9px] text-[#555] font-mono ml-auto">{sorted.length} drones</span>
+        <span className="text-xs text-[#666] font-mono ml-auto">{sorted.length} drones</span>
       </div>
 
       <div className="overflow-x-auto rounded-lg border border-[#222]">
@@ -389,7 +401,7 @@ function DroneIntelTable({ droneStats, onDroneClick }) {
               {th('drone_id','Drone ID')}{th('model','Model')}{th('group','Group')}{th('detections','Events')}
               {th('threat','Threat')}{th('maxHeight','Max H')}{th('maxSpeed','Max Spd')}{th('avgSpeed','Avg Spd')}
               {th('protocols','Protocol')}
-              <th className="px-3 py-2 text-[9px] font-bold text-[#666] uppercase">Dirs</th>
+              <th className="px-3 py-2.5 text-xs font-bold text-[#777] uppercase">Dirs</th>
               {th('firstSeen','First Seen')}{th('lastSeen','Last Seen')}
             </tr>
           </thead>
@@ -399,18 +411,18 @@ function DroneIntelTable({ droneStats, onDroneClick }) {
               const gc = d.group === 'GA' ? GA : GB;
               return (
                 <tr key={d.drone_id} className="border-b border-[#1a1a1a] hover:bg-[#1c1c1c] cursor-pointer transition-colors" onClick={() => onDroneClick(d.drone_id)}>
-                  <td className="px-3 py-2 text-[10px] font-mono font-bold" style={{ color: gc }}>{d.drone_id}</td>
-                  <td className="px-3 py-2 text-[10px] text-[#ccc] whitespace-nowrap">{d.model}</td>
-                  <td className="px-3 py-2"><span className="text-[8px] px-1.5 py-0.5 rounded-full font-bold" style={{ background:`${gc}22`, color:gc, border:`1px solid ${gc}44` }}>{d.group}</span></td>
-                  <td className="px-3 py-2 text-[10px] font-mono font-bold text-white">{d.detections}</td>
-                  <td className="px-3 py-2"><span className="text-[8px] px-1.5 py-0.5 rounded font-bold" style={{ background:`${tc}22`, color:tc }}>{d.threat}</span></td>
-                  <td className="px-3 py-2 text-[10px] font-mono text-[#888]">{d.maxHeight} m</td>
-                  <td className="px-3 py-2 text-[10px] font-mono text-[#888]">{d.maxSpeed} m/s</td>
-                  <td className="px-3 py-2 text-[10px] font-mono text-[#888]">{d.avgSpeed} m/s</td>
-                  <td className="px-3 py-2 text-[9px] text-[#666]">{d.protocols.join(', ') || '—'}</td>
-                  <td className="px-3 py-2 text-[9px] font-mono text-[#666]">{d.directions.join(' ') || '—'}</td>
-                  <td className="px-3 py-2 text-[9px] font-mono text-[#555] whitespace-nowrap">{formatDate(d.firstSeen)}</td>
-                  <td className="px-3 py-2 text-[9px] font-mono text-[#555] whitespace-nowrap">{formatDate(d.lastSeen)}</td>
+                  <td className="px-3 py-2.5 text-xs font-mono font-bold" style={{ color: gc }}>{d.drone_id}</td>
+                  <td className="px-3 py-2.5 text-xs text-[#ddd] whitespace-nowrap">{d.model}</td>
+                  <td className="px-3 py-2.5"><span className="text-[10px] px-1.5 py-0.5 rounded-full font-bold" style={{ background:`${gc}22`, color:gc, border:`1px solid ${gc}44` }}>{d.group}</span></td>
+                  <td className="px-3 py-2.5 text-xs font-mono font-bold text-white">{d.detections}</td>
+                  <td className="px-3 py-2.5"><span className="text-[10px] px-1.5 py-0.5 rounded font-bold" style={{ background:`${tc}22`, color:tc }}>{d.threat}</span></td>
+                  <td className="px-3 py-2.5 text-xs font-mono text-[#aaa]">{d.maxHeight} m</td>
+                  <td className="px-3 py-2.5 text-xs font-mono text-[#aaa]">{d.maxSpeed} m/s</td>
+                  <td className="px-3 py-2.5 text-xs font-mono text-[#aaa]">{d.avgSpeed} m/s</td>
+                  <td className="px-3 py-2.5 text-xs text-[#888]">{d.protocols.join(', ') || '—'}</td>
+                  <td className="px-3 py-2.5 text-xs font-mono text-[#888]">{d.directions.join(' ') || '—'}</td>
+                  <td className="px-3 py-2.5 text-xs font-mono text-[#777] whitespace-nowrap">{formatDate(d.firstSeen)}</td>
+                  <td className="px-3 py-2.5 text-xs font-mono text-[#777] whitespace-nowrap">{formatDate(d.lastSeen)}</td>
                 </tr>
               );
             })}
@@ -449,16 +461,16 @@ export default function EventLog({ events, isLoading, currentPage, setCurrentPag
       <div className="flex-1 flex flex-col overflow-hidden bg-[#0a0a0a]">
         {/* Date range search bar */}
         <div className="flex-none border-b border-[#2a2a2a] bg-[#111] px-4 py-2.5 flex items-center gap-3 flex-wrap">
-          <span className="text-[9px] text-[#555] uppercase tracking-widest font-bold whitespace-nowrap">Date Range</span>
+          <span className="text-xs text-[#666] uppercase tracking-wider font-semibold whitespace-nowrap">Date Range</span>
           <div className="flex items-center gap-2 flex-wrap flex-1">
             <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
-              className="bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg px-2.5 py-1 text-[11px] text-white outline-none focus:border-orange-500 transition-colors" />
-            <span className="text-[10px] text-[#444]">—</span>
+              className="bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg px-2.5 py-1 text-xs text-white outline-none focus:border-orange-500 transition-colors" />
+            <span className="text-xs text-[#555]">—</span>
             <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)}
-              className="bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg px-2.5 py-1 text-[11px] text-white outline-none focus:border-orange-500 transition-colors" />
+              className="bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg px-2.5 py-1 text-xs text-white outline-none focus:border-orange-500 transition-colors" />
             <button onClick={handleSearch} disabled={isLoading}
-              className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-[10px] font-bold transition-all disabled:opacity-40"
-              style={{ background: '#1a1a1a', border: '1px solid #3a3a3a', color: '#aaa' }}>
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all disabled:opacity-40 hover:border-[#555] hover:text-white"
+              style={{ background: '#1a1a1a', border: '1px solid #3a3a3a', color: '#ccc' }}>
               {isLoading
                 ? <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />Searching…</>
                 : <><SearchIcon className="w-3 h-3 text-orange-400" />Search</>}
@@ -474,10 +486,10 @@ export default function EventLog({ events, isLoading, currentPage, setCurrentPag
             </span>
           </div>
           <span className="text-[10px] text-[#444] ml-1">Click a row to see 7-day history</span>
-          <button onClick={() => exportCSV(events)} disabled={!events.length}
-            className="ml-auto flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-semibold text-[#ccc] rounded-md transition-all disabled:opacity-30"
+          <button onClick={() => exportCSV(droneStats)} disabled={!droneStats.length}
+            className="ml-auto flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-[#ddd] rounded-md transition-all disabled:opacity-30 hover:border-[#555] hover:text-white"
             style={{ background:'#1e1e1e', border:'1px solid #3a3a3a' }}>
-            <DownloadIcon className="w-3 h-3" />
+            <DownloadIcon className="w-3.5 h-3.5" />
             Export CSV
           </button>
         </Toolbar>

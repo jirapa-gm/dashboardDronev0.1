@@ -30,10 +30,10 @@ export function EmptyState({ icon = '📊', message = 'No data', sub = '' }) {
 export function Card({ title, icon, children, className = '', action }) {
   return (
     <div className={`bg-[#141414] border border-[#2a2a2a] rounded-xl overflow-hidden ${className}`}>
-      <div className="flex items-center justify-between px-4 py-2.5 border-b border-[#222]">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-[#222]">
         <div className="flex items-center gap-2">
           <span className="text-orange-500">{icon}</span>
-          <span className="text-[10px] font-bold text-[#666] uppercase tracking-widest">{title}</span>
+          <span className="text-xs font-bold text-[#888] uppercase tracking-wider">{title}</span>
         </div>
         {action}
       </div>
@@ -61,7 +61,7 @@ export function GroupTabs({ value, onChange }) {
         const active = value === g;
         return (
           <button key={g} onClick={() => onChange(g)}
-            className="text-[10px] px-3 py-1 rounded-full font-bold transition-all"
+            className="text-xs px-3 py-1 rounded-full font-bold transition-all"
             style={{ background: active ? `${c}22` : '#1e1e1e', border: `1px solid ${active ? c : '#3a3a3a'}`, color: active ? c : '#777' }}>
             {g}
           </button>
@@ -99,11 +99,11 @@ export function SectionHeader({ label, icon, isOpen, onToggle, count }) {
   return (
     <button onClick={onToggle}
       className="w-full flex items-center justify-between px-4 py-3 hover:bg-[#202020] transition-colors group">
-      <div className="flex items-center gap-2 text-[11px] font-bold text-[#777] uppercase tracking-widest">
+      <div className="flex items-center gap-2 text-xs font-bold text-[#888] uppercase tracking-wider">
         <span className="text-[#555] group-hover:text-[#777]">{icon}</span>
         {label}
         {count !== undefined && (
-          <span className="px-2 py-0.5 rounded text-[10px] font-bold" style={{ background: '#1a1a1a', color: '#666', border: '1px solid #333' }}>
+          <span className="px-2 py-0.5 rounded text-xs font-bold" style={{ background: '#1a1a1a', color: '#777', border: '1px solid #333' }}>
             {count}
           </span>
         )}
@@ -117,7 +117,7 @@ export function SectionHeader({ label, icon, isOpen, onToggle, count }) {
 export function Field({ label, children }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <label className="text-[11px] font-semibold text-[#999] uppercase tracking-wider">{label}</label>
+      <label className="text-xs font-semibold text-[#888] uppercase tracking-wider">{label}</label>
       {children}
     </div>
   );
@@ -126,18 +126,18 @@ export function Field({ label, children }) {
 // ── Horizontal bar chart row ──────────────────────────────────────────────────
 export function HBar({ data, colors, maxCount, total }) {
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-2.5">
       {data.map(([label, count], i) => {
         const pct   = ((count / maxCount) * 100).toFixed(1);
         const share = ((count / total) * 100).toFixed(0);
         const color = colors[i % colors.length];
         return (
           <div key={label}>
-            <div className="flex justify-between text-[9px] mb-1">
-              <span className="text-[#888] truncate max-w-[120px]">{label}</span>
-              <span className="font-mono font-bold" style={{ color }}>{count} <span className="text-[#444]">({share}%)</span></span>
+            <div className="flex justify-between text-xs mb-1">
+              <span className="text-[#999] truncate max-w-[140px]">{label}</span>
+              <span className="font-mono font-bold" style={{ color }}>{count} <span className="text-[#555]">({share}%)</span></span>
             </div>
-            <div className="h-1.5 rounded-full overflow-hidden" style={{ background: '#1e1e1e' }}>
+            <div className="h-2 rounded-full overflow-hidden" style={{ background: '#1e1e1e' }}>
               <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: color }} />
             </div>
           </div>
