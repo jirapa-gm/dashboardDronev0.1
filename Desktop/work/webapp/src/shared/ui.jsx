@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { GA, GB } from './constants';
 import { ChevronIcon } from './icons';
 
@@ -116,30 +117,70 @@ export function SectionHeader({ label, icon, isOpen, onToggle, count }) {
 // ── Form field label wrapper ──────────────────────────────────────────────────
 export function Field({ label, children }) {
   return (
-    <div className="flex flex-col gap-1.5">
-      <label className="text-xs font-semibold text-[#888] uppercase tracking-wider">{label}</label>
+    <div className="flex flex-col gap-1">
+      <label className="text-[10px] font-semibold text-[#666] uppercase tracking-wider">{label}</label>
       {children}
+    </div>
+  );
+}
+
+// ── Loading skeleton ───────────────────────────────────────────────────────────
+export function LoadingSkeleton({ rows = 4, className = '' }) {
+  return (
+    <div className={`flex flex-col gap-3 animate-pulse ${className}`}>
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} className="flex flex-col gap-2">
+          <div className="flex justify-between">
+            <div className="h-3 rounded" style={{ background: '#222', width: `${40 + (i * 17) % 35}%` }} />
+            <div className="h-3 rounded w-12" style={{ background: '#1e1e1e' }} />
+          </div>
+          <div className="h-2 rounded-full" style={{ background: '#1a1a1a' }}>
+            <div className="h-full rounded-full" style={{ background: '#2a2a2a', width: `${30 + (i * 23) % 50}%` }} />
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
 
 // ── Horizontal bar chart row ──────────────────────────────────────────────────
 export function HBar({ data, colors, maxCount, total }) {
+  const [hovered, setHovered] = useState(null);
   return (
     <div className="flex flex-col gap-2.5">
       {data.map(([label, count], i) => {
         const pct   = ((count / maxCount) * 100).toFixed(1);
         const share = ((count / total) * 100).toFixed(0);
         const color = colors[i % colors.length];
+        const isHov = hovered === i;
         return (
-          <div key={label}>
+          <div key={label} className="relative cursor-default"
+               onMouseEnter={() => setHovered(i)}
+               onMouseLeave={() => setHovered(null)}
+               tabIndex={0} onFocus={() => setHovered(i)} onBlur={() => setHovered(null)}
+               aria-label={`${label}: ${count} (${share}%)`}
+               style={{ outline: 'none' }}>
             <div className="flex justify-between text-xs mb-1">
-              <span className="text-[#999] truncate max-w-[140px]">{label}</span>
-              <span className="font-mono font-bold" style={{ color }}>{count} <span className="text-[#555]">({share}%)</span></span>
+              <span className="text-[#999] truncate max-w-[140px]" style={{ color: isHov ? '#fff' : undefined }}>{label}</span>
+              <span className="font-mono font-bold" style={{ color }}>
+                {count} <span className="text-[#555]">({share}%)</span>
+              </span>
             </div>
             <div className="h-2 rounded-full overflow-hidden" style={{ background: '#1e1e1e' }}>
-              <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: color }} />
+              <div className="h-full rounded-full transition-all duration-500"
+                   style={{ width: `${pct}%`, background: color, opacity: isHov ? 1 : 0.85, boxShadow: isHov ? `0 0 6px ${color}88` : 'none' }} />
             </div>
+            {isHov && (
+              <div style={{
+                position: 'absolute', right: 0, top: -36,
+                background: '#1a1a1a', border: `1px solid ${color}55`, borderRadius: 6,
+                padding: '4px 10px', zIndex: 20, pointerEvents: 'none',
+                boxShadow: '0 4px 16px rgba(0,0,0,0.6)', whiteSpace: 'nowrap',
+              }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color, fontFamily: 'monospace' }}>{count}</span>
+                <span style={{ fontSize: 10, color: '#888', marginLeft: 6 }}>/ {total} total ({share}%)</span>
+              </div>
+            )}
           </div>
         );
       })}

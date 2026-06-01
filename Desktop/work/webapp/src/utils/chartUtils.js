@@ -1,3 +1,4 @@
+//สรุปแนวโน้มรายวัน
 export function buildDailyMap(events) {
   return events.reduce((acc, e) => {
     const d = e.datetime.split('T')[0];
@@ -7,7 +8,7 @@ export function buildDailyMap(events) {
     return acc;
   }, {});
 }
-
+//จำนวนซ้ำ
 export function buildDistribution(events, field) {
   const map = events.reduce((acc, e) => {
     const key = e[field] ? String(e[field]).trim() : 'Unknown';
@@ -16,7 +17,7 @@ export function buildDistribution(events, field) {
   }, {});
   return Object.entries(map).sort(([, a], [, b]) => b - a);
 }
-
+//กราฟรายชั่วโมง
 export function buildHourlyMap(events) {
   const map = Array.from({ length: 24 }, (_, h) => ({ hour: h, GA: 0, GB: 0 }));
   events.forEach((e) => {
@@ -28,7 +29,7 @@ export function buildHourlyMap(events) {
   });
   return map;
 }
-
+//เปรียบเทียบทิศไหนเจอเยอะ
 export function buildDirectionMap(events) {
   const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
   const map  = Object.fromEntries(dirs.map((d) => [d, { GA: 0, GB: 0 }]));
@@ -40,7 +41,7 @@ export function buildDirectionMap(events) {
   });
   return dirs.map((d) => ({ dir: d, ...map[d], total: map[d].GA + map[d].GB }));
 }
-
+//ประมวลผลเชิงลึกรายลำ แฟ้มประวัติ
 export function buildDroneStats(events) {
   const map = {};
   events.forEach((e) => {
@@ -84,7 +85,7 @@ export function buildDroneStats(events) {
     directions: [...d.directions],
   })).sort((a, b) => b.detections - a.detections);
 }
-
+//คำนวน card สถิติ
 export function buildKPIs(events) {
   if (!events.length) return { total: 0, ga: 0, gb: 0, unique: 0, detectors: 0, avgSpeed: '—', avgHeight: '—', maxSpeed: '—', highThreat: 0 };
   const ga        = events.filter((e) => e.group === 'GA').length;
@@ -97,7 +98,7 @@ export function buildKPIs(events) {
   const highThreat = events.filter((e) => e.threat === 'HIGH').length;
   return { total: events.length, ga, gb, unique, detectors, avgSpeed, avgHeight, maxSpeed, highThreat };
 }
-
+//คำนวนความถี่ คัดแยก นับจำนวน
 export function buildFreqBands(events) {
   const bands = { '2400–2430': 0, '2430–2460': 0, '2460–2500': 0 };
   events.forEach((e) => {

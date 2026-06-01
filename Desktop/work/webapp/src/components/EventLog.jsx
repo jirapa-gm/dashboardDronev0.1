@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { THREAT_COLOR, GA, GB } from '../shared/constants';
 import { distColor, dirLabel, getProtocolColor, formatDate } from '../shared/helpers';
 import { SearchIcon, DownloadIcon, TableIcon } from '../shared/icons';
@@ -33,32 +33,6 @@ function exportCSV(droneStats) {
   URL.revokeObjectURL(url);
 }
 
-// ── Build drone stats from raw events ────────────────────────────────────────
-function buildDroneStats(events) {
-  const map = {};
-  events.forEach(e => {
-    if (!map[e.drone_id]) map[e.drone_id] = {
-      drone_id: e.drone_id, model: e.model ? String(e.model).trim() : 'Unknown',
-      group: e.group, detections: 0, maxHeight: 0, maxSpeed: 0, totalSpeed: 0,
-      freqs: new Set(), protocols: new Set(), directions: new Set(),
-      firstSeen: e.datetime, lastSeen: e.datetime, threat: e.threat || 'LOW',
-    };
-    const d = map[e.drone_id];
-    d.detections++; d.maxHeight = Math.max(d.maxHeight, e.height ?? 0);
-    d.maxSpeed = Math.max(d.maxSpeed, e.speed ?? 0); d.totalSpeed += (e.speed ?? 0);
-    if (e.freq)      d.freqs.add(e.freq);
-    if (e.protocol)  d.protocols.add(e.protocol);
-    if (e.direction) d.directions.add(e.direction);
-    if (e.datetime < d.firstSeen) d.firstSeen = e.datetime;
-    if (e.datetime > d.lastSeen)  d.lastSeen  = e.datetime;
-    const rank = { LOW: 0, MEDIUM: 1, HIGH: 2 };
-    if ((rank[e.threat] ?? 0) > (rank[d.threat] ?? 0)) d.threat = e.threat;
-  });
-  return Object.values(map).map(d => ({
-    ...d, avgSpeed: parseFloat((d.totalSpeed / d.detections).toFixed(2)),
-    freqs: [...d.freqs].sort(), protocols: [...d.protocols], directions: [...d.directions],
-  })).sort((a, b) => b.detections - a.detections);
-}
 
 // ── Altitude gauge ─────────────────────────────────────────────────────────────
 function AltitudeGauge({ height, maxHeight = 500 }) {
@@ -146,9 +120,23 @@ function DetectionTimeline({ detections }) {
     return { x: toX(d.getTime()), label: `${d.getMonth()+1}/${d.getDate()}` };
   }).reverse();
 
+  // Format time helper
+  const fmtTime = ms => {
+    const min = Math.round(ms / 60000);
+    if (min < 1) return '< 1 min';
+    if (min < 60) return `${min} min`;
+    return `${Math.floor(min/60)}h ${min%60}m`;
+  };
+  const fmtHHMM = ts => new Date(ts).toLocaleString('th-TH', { hour:'2-digit', minute:'2-digit' });
+  const fmtDate = ts => new Date(ts).toLocaleString('th-TH', { month:'2-digit', day:'2-digit' });
+
+  const totalMs = sessions.reduce((s, ss) => s + (ss.end - ss.start), 0);
+
   return (
-    <div className="flex flex-col gap-1">
+    <div className="flex flex-col gap-1.5">
       <div className="text-[9px] text-[#555] uppercase tracking-widest font-bold">7-Day Detection Timeline</div>
+
+      {/* Timeline bar */}
       <div className="relative" style={{ height: 28, background: '#0d0d0d', borderRadius: 6, border: '1px solid #1e1e1e' }}>
         {dayLabels.map((dl, i) => (
           <div key={i} style={{ position: 'absolute', left: `${dl.x}%`, top: 0, bottom: 0, borderLeft: '1px solid #1e1e1e', pointerEvents: 'none' }}>
@@ -162,20 +150,58 @@ function DetectionTimeline({ detections }) {
         {hover !== null && sessions[hover] && (() => {
           const s = sessions[hover];
           const x1 = toX(s.start);
-          const dMin = Math.round((s.end - s.start) / 60000);
-          const startStr = new Date(s.start).toLocaleString('th-TH', { month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' });
-          const endStr   = s.end !== s.start ? new Date(s.end).toLocaleString('th-TH', { hour:'2-digit', minute:'2-digit' }) : '—';
+          const dMs = s.end - s.start;
           return (
-            <div style={{ position:'absolute', left:`${Math.min(x1,65)}%`, top:-60, background:'rgba(14,14,14,0.97)', border:'1px solid #333', borderRadius:8, padding:'6px 10px', zIndex:10, pointerEvents:'none', minWidth:160, boxShadow:'0 8px 24px rgba(0,0,0,0.6)' }}>
-              <div style={{ fontSize:10, color:'#f97316', fontWeight:700, marginBottom:3 }}>Session #{hover + 1}</div>
-              <div style={{ fontSize:9, color:'#888', fontFamily:'monospace' }}>{startStr} → {endStr}</div>
-              <div style={{ fontSize:9, color:'#aaa', marginTop:3 }}>Duration: <b style={{ color:'#fff' }}>{dMin || '< 1'} min</b></div>
-              <div style={{ fontSize:9, color:'#aaa' }}>Events: <b style={{ color:'#fff' }}>{s.events.length}</b> · Detectors: <b style={{ color:'#3b82f6' }}>{[...s.detectors].join(', ')}</b></div>
+            <div style={{ position:'absolute', left:`${Math.min(x1,60)}%`, top:-52, background:'rgba(14,14,14,0.97)', border:'1px solid #333', borderRadius:7, padding:'5px 9px', zIndex:10, pointerEvents:'none', minWidth:150, boxShadow:'0 6px 20px rgba(0,0,0,0.7)' }}>
+              <div style={{ fontSize:9, color:'#f97316', fontWeight:700, marginBottom:2, fontFamily:'monospace' }}>#{hover+1} · {fmtTime(dMs)}</div>
+              <div style={{ fontSize:9, color:'#777', fontFamily:'monospace' }}>{fmtDate(s.start)} {fmtHHMM(s.start)} → {fmtHHMM(s.end)}</div>
+              <div style={{ fontSize:9, color:'#666', marginTop:2 }}>Events: <b style={{ color:'#ccc' }}>{s.events.length}</b></div>
             </div>
           );
         })()}
       </div>
+
+      {/* Day label spacer */}
       <div style={{ height: 14 }} />
+
+      {/* Session duration summary cards */}
+      <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+          <span style={{ fontSize:9, color:'#555', textTransform:'uppercase', letterSpacing:'0.12em', fontFamily:'monospace', fontWeight:700 }}>Detection Sessions</span>
+          <span style={{ fontSize:9, color:'#888', fontFamily:'monospace' }}>รวม {fmtTime(totalMs)}</span>
+        </div>
+        {sessions.map((s, i) => {
+          const dMs   = s.end - s.start;
+          const dMin  = Math.round(dMs / 60000);
+          const isCrit = s.events.some(e => (e.estimated_distance_m ?? 999) < 100);
+          const color  = isCrit ? '#ef4444' : '#f97316';
+          const barW   = sessions.length > 1 ? Math.max((dMs / (sessions.reduce((a,b) => a + (b.end - b.start), 0) || 1)) * 100, 4) : 100;
+          return (
+            <div key={i} style={{ background:'#111', border:`1px solid ${color}22`, borderRadius:7, padding:'7px 10px' }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:5 }}>
+                <div style={{ display:'flex', alignItems:'center', gap:7 }}>
+                  <div style={{ width:6, height:6, borderRadius:'50%', background:color, flexShrink:0 }} />
+                  <span style={{ fontSize:10, fontWeight:700, color:'#ccc', fontFamily:'monospace' }}>
+                    {fmtDate(s.start)} {fmtHHMM(s.start)}
+                    <span style={{ color:'#555', margin:'0 4px' }}>→</span>
+                    {fmtHHMM(s.end)}
+                  </span>
+                </div>
+                <span style={{ fontSize:13, fontWeight:800, color, fontFamily:'monospace' }}>
+                  {dMin < 1 ? '< 1' : dMin} <span style={{ fontSize:9, fontWeight:500, color:'#666' }}>min</span>
+                </span>
+              </div>
+              <div style={{ height:3, background:'#1e1e1e', borderRadius:2, overflow:'hidden' }}>
+                <div style={{ height:'100%', width:`${barW}%`, background:color, borderRadius:2, opacity:0.7 }} />
+              </div>
+              <div style={{ display:'flex', justifyContent:'space-between', marginTop:4 }}>
+                <span style={{ fontSize:8, color:'#555', fontFamily:'monospace' }}>{s.events.length} events · {[...s.detectors].length} detector{[...s.detectors].length>1?'s':''}</span>
+                {isCrit && <span style={{ fontSize:8, color:'#ef4444', fontWeight:700 }}>⚠ CLOSE RANGE</span>}
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -221,16 +247,16 @@ function DroneHistoryPanel({ droneId, allEvents, onClose }) {
       background:'#1a1a1a', border:'1px solid #262626', borderRadius:8,
       padding:'9px 13px', gridColumn: span ? 'span 2' : undefined,
     }}>
-      <div style={{ fontSize:7.5, color:'#4a4a4a', textTransform:'uppercase', letterSpacing:'0.13em', marginBottom:5, fontFamily:'monospace' }}>{label}</div>
-      <div style={{ fontSize:13, fontWeight:700, fontFamily:'monospace', color: color ?? '#c8c8c8', lineHeight:1.2 }}>{value ?? '—'}</div>
+      <div style={{ fontSize:9, color:'#555', textTransform:'uppercase', letterSpacing:'0.12em', marginBottom:5, fontFamily:'monospace' }}>{label}</div>
+      <div style={{ fontSize:14, fontWeight:700, fontFamily:'monospace', color: color ?? '#c8c8c8', lineHeight:1.2 }}>{value ?? '—'}</div>
     </div>
   );
 
   const Divider = ({ label }) => (
-    <div style={{ display:'flex', alignItems:'center', gap:8, margin:'2px 0' }}>
-      <div style={{ flex:1, height:1, background:'#222' }} />
-      <span style={{ fontSize:8, color:'#3a3a3a', textTransform:'uppercase', letterSpacing:'0.12em', fontFamily:'monospace' }}>{label}</span>
-      <div style={{ flex:1, height:1, background:'#222' }} />
+    <div style={{ display:'flex', alignItems:'center', gap:8, margin:'4px 0' }}>
+      <div style={{ flex:1, height:1, background:'#2a2a2a' }} />
+      <span style={{ fontSize:9, color:'#666', textTransform:'uppercase', letterSpacing:'0.14em', fontFamily:'monospace', fontWeight:700 }}>{label}</span>
+      <div style={{ flex:1, height:1, background:'#2a2a2a' }} />
     </div>
   );
 
@@ -329,6 +355,18 @@ function DroneHistoryPanel({ droneId, allEvents, onClose }) {
             <F label="Last Seen"  value={lastSeen  ? formatDate(lastSeen)  : '—'} color="#888" />
           </div>
 
+          {/* Detection sessions timeline */}
+          <div style={{ marginTop:4 }}>
+            <DetectionTimeline detections={detections} />
+          </div>
+
+          {/* RSSI sparkline */}
+          {detections.length >= 2 && (
+            <div style={{ marginTop:2 }}>
+              <SignalSparkline detections={detections} width={360} height={40} />
+            </div>
+          )}
+
           <div style={{ height:4 }} />
         </div>
 
@@ -358,7 +396,7 @@ function DroneIntelTable({ droneStats, onDroneClick }) {
 
   const sorted = useMemo(() => {
     let arr = droneStats;
-    if (search)            arr = arr.filter(d => d.drone_id.toLowerCase().includes(search.toLowerCase()) || d.model.toLowerCase().includes(search.toLowerCase()));
+    if (search)            arr = arr.filter(d => (d.drone_id || '').toLowerCase().includes(search.toLowerCase()) || (d.model || '').toLowerCase().includes(search.toLowerCase()));
     if (groupF  !== 'ALL') arr = arr.filter(d => d.group  === groupF);
     if (threatF !== 'ALL') arr = arr.filter(d => d.threat === threatF);
     return [...arr].sort((a, b) => sort.dir * (String(a[sort.key]) < String(b[sort.key]) ? -1 : 1));
@@ -442,11 +480,10 @@ function DroneIntelTable({ droneStats, onDroneClick }) {
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
-export default function EventLog({ events, isLoading, currentPage, setCurrentPage, onSearch, defaultStartDate, defaultEndDate }) {
+export default function EventLog({ events, droneStats, isLoading, currentPage, setCurrentPage, onSearch, defaultStartDate, defaultEndDate }) {
   const [selectedDroneId, setSelectedDroneId] = useState(null);
   const [startDate, setStartDate] = useState(defaultStartDate ?? '');
   const [endDate,   setEndDate]   = useState(defaultEndDate   ?? '');
-  const droneStats = useMemo(() => buildDroneStats(events), [events]);
 
   const handleSearch = () => {
     if (onSearch) onSearch({ startDate, endDate });
@@ -487,16 +524,32 @@ export default function EventLog({ events, isLoading, currentPage, setCurrentPag
           </div>
           <span className="text-[10px] text-[#444] ml-1">Click a row to see 7-day history</span>
           <button onClick={() => exportCSV(droneStats)} disabled={!droneStats.length}
-            className="ml-auto flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-[#ddd] rounded-md transition-all disabled:opacity-30 hover:border-[#555] hover:text-white"
-            style={{ background:'#1e1e1e', border:'1px solid #3a3a3a' }}>
-            <DownloadIcon className="w-3.5 h-3.5" />
+            className="ml-auto flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded transition-all disabled:opacity-30 hover:border-[#555] hover:text-white"
+            style={{ background:'#141414', border:'1px solid #2a2a2a', color:'#888' }}>
+            <DownloadIcon className="w-3 h-3" />
             Export CSV
           </button>
         </Toolbar>
 
         <div className="flex-1 overflow-auto p-4">
           {isLoading
-            ? <Spinner />
+            ? (
+              <div className="flex flex-col gap-3 animate-pulse">
+                <div className="flex gap-2 mb-2">
+                  {Array.from({length:4}).map((_,i) => <div key={i} className="h-8 rounded-lg flex-1" style={{ background: '#141414', border: '1px solid #2a2a2a' }} />)}
+                </div>
+                <div className="rounded-lg overflow-hidden border border-[#222]">
+                  <div className="grid px-3 py-2.5 gap-3" style={{ gridTemplateColumns:'2fr 1.5fr 0.8fr 0.8fr 1fr 1fr 1fr 1fr 1fr', background:'#1a1a1a', borderBottom:'1px solid #2a2a2a' }}>
+                    {Array.from({length:9}).map((_,i) => <div key={i} className="h-2 rounded" style={{ background:'#2a2a2a' }} />)}
+                  </div>
+                  {Array.from({length:8}).map((_,i) => (
+                    <div key={i} className="grid px-3 py-3 gap-3 border-b border-[#161616]" style={{ gridTemplateColumns:'2fr 1.5fr 0.8fr 0.8fr 1fr 1fr 1fr 1fr 1fr', background: i%2===0?'#0d0d0d':'#0a0a0a' }}>
+                      {Array.from({length:9}).map((_,j) => <div key={j} className="h-3 rounded" style={{ background: '#1a1a1a', width:`${50+(j*19)%40}%` }} />)}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
             : droneStats.length === 0
             ? <div className="p-10 text-center text-[#555] text-sm">No drone data found</div>
             : <DroneIntelTable droneStats={droneStats} onDroneClick={setSelectedDroneId} />}

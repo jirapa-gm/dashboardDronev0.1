@@ -396,11 +396,6 @@ const MAP_CSS = `
 .tac-tt{background:#1a1a1a!important;border:1px solid #333!important;border-radius:8px!important;font-family:monospace!important;font-size:12px!important;box-shadow:0 4px 16px rgba(0,0,0,.5)!important;color:#ccc!important}
 .tac-tt::before{display:none!important}`;
 
-// ── Radar mode: 'none' | 'global' | detectorId ──
-// 'none'   = no radar drawn
-// 'global' = global overview radar
-// detId    = per-detector radar for that detector
-
 // ── Main component ─────────────────────────────────────────────────────────────
 export default function TacticalMapView({ events, isLoading }) {
   const [filterGroup, setFilterGroup] = useState('ALL');

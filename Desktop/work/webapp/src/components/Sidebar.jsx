@@ -295,7 +295,7 @@ export function DetectorSummary({ detectorId, events }) {
 
   if (!detEvents.length) return <EmptyMsg label={`No events for ${detectorId}`}/>;
 
-  const HEADERS = ['Datetime','Drone ID','Model','Threat','Protocol','Alt','Speed','Dist','RSSI','SNR','GPS','Reg.','AoA','Dir'];
+  const HEADERS = ['Datetime','Drone ID','Model','Threat','Alt','Speed','Dist','RSSI','SNR','GPS','Reg.','AoA','Dir'];
 
   return (
     <div className="flex-1 overflow-y-auto bg-[#0a0a0a]">
@@ -337,7 +337,6 @@ export function DetectorSummary({ detectorId, events }) {
                         <td className="px-3 py-2.5 text-[12px] font-mono font-bold whitespace-nowrap" style={{ color:gc }}>{e.drone_id}</td>
                         <td className="px-3 py-2.5 text-[12px] text-[#bbb] whitespace-nowrap">{e.model}</td>
                         <td className="px-3 py-2.5"><span className="text-[10px] px-2 py-0.5 rounded font-bold" style={{ background:`${tc}18`, color:tc }}>{e.threat}</span></td>
-                        <td className="px-3 py-2.5 text-[11px] font-bold whitespace-nowrap" style={{ color:pc }}>{e.protocol_name??'—'}</td>
                         <td className="px-3 py-2.5 text-[12px] font-mono text-[#777]">{e.height} m</td>
                         <td className="px-3 py-2.5 text-[12px] font-mono text-[#777]">{e.speed} m/s</td>
                         <td className="px-3 py-2.5 text-[12px] font-mono" style={{ color:(e.estimated_distance_m??999)<100?'#ef4444':'#777' }}>{e.estimated_distance_m??'—'} m</td>
@@ -350,9 +349,9 @@ export function DetectorSummary({ detectorId, events }) {
                       </tr>
                       {isSel && (
                         <tr key={`d${i}`}>
-                          <td colSpan={14} className="px-5 py-4 bg-[#0d0d0d] border-b border-[#1a1a1a]">
+                          <td colSpan={13} className="px-5 py-4 bg-[#0d0d0d] border-b border-[#1a1a1a]">
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                              {[['Event ID',e.id],['Lat/Lon',`${e.latitude?.toFixed(5)}, ${e.longitude?.toFixed(5)}`],['Bearing',e.bearing!=null?`${e.bearing}°`:'—'],['Freq',`${e.freq} MHz`],['Protocol',e.protocol],['Pilot Lat',e.pilot_lat?.toFixed(5)??'—'],['Pilot Lon',e.pilot_lng?.toFixed(5)??'—'],['P→D Dist',e.pilot_drone_distance_m!=null?`${e.pilot_drone_distance_m} m`:'—'],['Det. Lat',e.detector_lat?.toFixed(5)],['Det. Lon',e.detector_lon?.toFixed(5)],['Det. Name',e.detector_name],['Subgroup',e.subgroup]].map(([k,v]) => (
+                              {[['Event ID',e.id],['Lat/Lon',`${e.latitude?.toFixed(5)}, ${e.longitude?.toFixed(5)}`],['Bearing',e.bearing!=null?`${e.bearing}°`:'—'],['Freq',`${e.freq} MHz`],['Pilot Lat',e.pilot_lat?.toFixed(5)??'—'],['Pilot Lon',e.pilot_lng?.toFixed(5)??'—'],['P→D Dist',e.pilot_drone_distance_m!=null?`${e.pilot_drone_distance_m} m`:'—'],['Det. Lat',e.detector_lat?.toFixed(5)],['Det. Lon',e.detector_lon?.toFixed(5)],['Det. Name',e.detector_name],['Subgroup',e.subgroup]].map(([k,v]) => (
                                 <div key={k} className="bg-[#111] rounded-lg px-3 py-2.5">
                                   <div className="text-[10px] text-[#444] uppercase mb-1">{k}</div>
                                   <div className="text-[12px] font-mono text-[#999]">{v??'—'}</div>

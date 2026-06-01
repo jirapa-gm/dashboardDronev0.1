@@ -43,7 +43,7 @@ function useSwipe(sidebarVisible, setSidebarVisible) {
   return { onStart, onEnd };
 }
 
-// ── Tab config ────────────────────────────────────────────────────────────────
+// ── เมนู ────────────────────────────────────────────────────────────────
 const TABS = [
   { id: 'analytics', label: 'Analytics',    Icon: ({ active }) => <BarChartIcon className="w-3 h-3" stroke={active ? '#f97316' : 'currentColor'} /> },
   { id: 'tactical',  label: 'Tactical Map', Icon: ({ active }) => <TargetIcon   className="w-3 h-3" stroke={active ? '#f97316' : 'currentColor'} /> },
@@ -52,7 +52,7 @@ const TABS = [
 
 // ── Tab bar ───────────────────────────────────────────────────────────────────
 function TabBar({ activeTab, setActiveTab, eventCount }) {
-  const BADGE_COLOR = '#f97316';
+  const BADGE_COLOR = '#dd8511';
   return (
     <div className="flex-none border-b border-[#3a3a3a] bg-[#1a1a1a] flex items-center px-4 gap-0.5 overflow-x-auto">
       {TABS.map(({ id, label, Icon }) => {
@@ -78,7 +78,7 @@ function TabBar({ activeTab, setActiveTab, eventCount }) {
   );
 }
 
-// ── Breadcrumb bar (shown inside analytics content area when drilling down) ───
+// ── แถบนำทาง ───
 function Breadcrumb({ activeGroup, activeSubgroup, activeDetector, onReset, onResetToGroup }) {
   const showDetector = activeDetector !== 'ALL';
   const showSubgroup = !showDetector && activeSubgroup !== 'ALL';
@@ -108,7 +108,7 @@ function Breadcrumb({ activeGroup, activeSubgroup, activeDetector, onReset, onRe
   );
 }
 
-// ── Swipe hint toast ──────────────────────────────────────────────────────────
+// ── pop-up  ──────────────────────────────────────────────────────────
 function SwipeHint() {
   const [visible, setVisible] = useState(true);
   useEffect(() => { const t = setTimeout(() => setVisible(false), 3000); return () => clearTimeout(t); }, []);
@@ -138,7 +138,11 @@ export default function App() {
   const { onStart, onEnd } = useSwipe(sidebarVisible, setSidebarVisible);
   useEffect(() => { setSidebarVisible(!isMobile); }, [isMobile]);
 
-  const { events, isLoading, currentPage, setCurrentPage, search } = useEvents(isMockMode);
+  const {
+    events, summary, daily, hourly, directions, freqBands, droneStats,
+    modelCount, protocolSummary,
+    isLoading, currentPage, setCurrentPage, search
+  } = useEvents(isMockMode);
   const defaultDates = getDefaultDates(isMockMode);
 
   useEffect(() => {
@@ -197,13 +201,27 @@ export default function App() {
             {showGroup    && <GroupSummary    groupId={activeGroup} events={events} />}
             {showSubgroup && <SubgroupSummary groupId={activeGroup} subgroupId={activeSubgroup} events={events} />}
             {showDetector && <DetectorSummary detectorId={activeDetector} events={events} />}
-            {!showSummary && <AnalyticsDashboard events={events} isLoading={isLoading} />}
+            {!showSummary && (
+              <AnalyticsDashboard
+                events={events}
+                summary={summary}
+                daily={daily}
+                hourly={hourly}
+                directions={directions}
+                freqBands={freqBands}
+                droneStats={droneStats}
+                modelCount={modelCount}
+                protocolSummary={protocolSummary}
+                isLoading={isLoading}
+                isMockMode={isMockMode}
+              />
+            )}
           </>}
 
           {activeTab === 'tactical' && <TacticalMapView events={events} isLoading={isLoading} />}
           {activeTab === 'log'      && (
             <EventLog
-              events={events} isLoading={isLoading}
+              events={events} droneStats={droneStats} isLoading={isLoading}
               currentPage={currentPage} setCurrentPage={setCurrentPage}
               onSearch={handleSearch}
               defaultStartDate={defaultDates.startDate} defaultEndDate={defaultDates.endDate}
