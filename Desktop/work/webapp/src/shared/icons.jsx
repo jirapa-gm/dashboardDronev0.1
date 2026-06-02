@@ -1,5 +1,3 @@
-// ── All reusable SVG icon components ─────────────────────────────────────────
-// Usage: <ChartIcon active /> or <SearchIcon className="w-4 h-4" />
 
 const ic = (path, extra = '') =>
   ({ className = 'w-3.5 h-3.5', stroke = 'currentColor', ...rest }) => (

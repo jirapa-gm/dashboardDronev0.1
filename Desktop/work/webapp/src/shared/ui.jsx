@@ -5,10 +5,10 @@ import { ChevronIcon } from './icons';
 // ── Loading spinner ───────────────────────────────────────────────────────────
 export function Spinner({ label = '' }) {
   return (
-    <div className="flex-1 flex items-center justify-center bg-[#0a0a0a]">
-      <div className="flex flex-col items-center gap-4">
-        <div className="w-8 h-8 border-2 border-[#2a2a2a] border-t-orange-500 rounded-full animate-spin" />
-        {label && <span className="text-[11px] text-[#555] uppercase tracking-widest">{label}</span>}
+    <div className="flex-1 flex-center-all bg-dark-0a">
+      <div className="flex-col-center gap-4">
+        <div className="spinner-circle animate-spin" />
+        {label && <span className="text-label-gray">{label}</span>}
       </div>
     </div>
   );
@@ -17,11 +17,11 @@ export function Spinner({ label = '' }) {
 // ── Empty state ───────────────────────────────────────────────────────────────
 export function EmptyState({ icon = '📊', message = 'No data', sub = '' }) {
   return (
-    <div className="flex-1 flex items-center justify-center bg-[#0f0f0f]">
+    <div className="flex-1 flex-center-all bg-dark-0f">
       <div className="text-center">
-        <div className="text-4xl mb-3">{icon}</div>
-        <div className="text-[#555] text-sm">{message}</div>
-        {sub && <div className="text-[#444] text-xs mt-1">{sub}</div>}
+        <div style={{ fontSize: '2.25rem', marginBottom: '0.75rem' }}>{icon}</div>
+        <div style={{ color: '#555', fontSize: '0.875rem' }}>{message}</div>
+        {sub && <div style={{ color: '#444', fontSize: '0.75rem', marginTop: '0.25rem' }}>{sub}</div>}
       </div>
     </div>
   );
@@ -30,15 +30,15 @@ export function EmptyState({ icon = '📊', message = 'No data', sub = '' }) {
 // ── Card container ────────────────────────────────────────────────────────────
 export function Card({ title, icon, children, className = '', action }) {
   return (
-    <div className={`bg-[#141414] border border-[#2a2a2a] rounded-xl overflow-hidden ${className}`}>
-      <div className="flex items-center justify-between px-4 py-3 border-b border-[#222]">
-        <div className="flex items-center gap-2">
-          <span className="text-orange-500">{icon}</span>
-          <span className="text-xs font-bold text-[#888] uppercase tracking-wider">{title}</span>
+    <div className={`card-container ${className}`}>
+      <div className="card-header">
+        <div className="card-title-group">
+          <span style={{ color: '#ea580c' }}>{icon}</span>
+          <span className="card-title-text">{title}</span>
         </div>
         {action}
       </div>
-      <div className="p-3">{children}</div>
+      <div className="card-body">{children}</div>
     </div>
   );
 }
@@ -46,8 +46,8 @@ export function Card({ title, icon, children, className = '', action }) {
 // ── Badge ─────────────────────────────────────────────────────────────────────
 export function Badge({ label, color, bg, border }) {
   return (
-    <span className="text-[8px] px-1.5 py-0.5 rounded font-bold"
-          style={{ background: bg ?? `${color}22`, color, border: `1px solid ${border ?? color + '44'}` }}>
+    <span className="rounded font-bold"
+          style={{ fontSize: '8px', padding: '2px 6px', background: bg ?? `${color}22`, color, border: `1px solid ${border ?? color + '44'}` }}>
       {label}
     </span>
   );
@@ -56,14 +56,14 @@ export function Badge({ label, color, bg, border }) {
 // ── Group filter tabs (ALL / GA / GB) ─────────────────────────────────────────
 export function GroupTabs({ value, onChange }) {
   return (
-    <div className="flex gap-1.5">
+    <div className="flex-row-center gap-1-5">
       {['ALL', 'GA', 'GB'].map(g => {
         const c = g === 'GA' ? GA : g === 'GB' ? GB : '#aaa';
         const active = value === g;
         return (
           <button key={g} onClick={() => onChange(g)}
-            className="text-xs px-3 py-1 rounded-full font-bold transition-all"
-            style={{ background: active ? `${c}22` : '#1e1e1e', border: `1px solid ${active ? c : '#3a3a3a'}`, color: active ? c : '#777' }}>
+            className="rounded-full font-bold transition-all"
+            style={{ fontSize: '12px', padding: '0.25rem 0.75rem', background: active ? `${c}22` : '#1e1e1e', border: `1px solid ${active ? c : '#3a3a3a'}`, color: active ? c : '#777', cursor: 'pointer' }}>
             {g}
           </button>
         );
@@ -75,7 +75,7 @@ export function GroupTabs({ value, onChange }) {
 // ── Toolbar wrapper ───────────────────────────────────────────────────────────
 export function Toolbar({ children }) {
   return (
-    <div className="px-4 py-2.5 border-b border-[#2a2a2a] bg-[#111] flex items-center gap-3 flex-wrap flex-none sticky top-0 z-10">
+    <div className="toolbar-styled">
       {children}
     </div>
   );
@@ -98,18 +98,17 @@ export function Collapsible({ isOpen, maxH = '800px', children }) {
 // ── Section header with collapse toggle ───────────────────────────────────────
 export function SectionHeader({ label, icon, isOpen, onToggle, count }) {
   return (
-    <button onClick={onToggle}
-      className="w-full flex items-center justify-between px-4 py-3 hover:bg-[#202020] transition-colors group">
-      <div className="flex items-center gap-2 text-xs font-bold text-[#888] uppercase tracking-wider">
-        <span className="text-[#555] group-hover:text-[#777]">{icon}</span>
-        {label}
+    <button onClick={onToggle} className="section-header">
+      <div className="flex-row-center gap-2 text-xs-caps-bold" style={{ color: '#888' }}>
+        <span style={{ color: '#555' }}>{icon}</span>
+        <span>{label}</span>
         {count !== undefined && (
-          <span className="px-2 py-0.5 rounded text-xs font-bold" style={{ background: '#1a1a1a', color: '#777', border: '1px solid #333' }}>
+          <span className="rounded font-bold" style={{ fontSize: '12px', padding: '2px 8px', background: '#1a1a1a', color: '#777', border: '1px solid #333' }}>
             {count}
           </span>
         )}
       </div>
-      <ChevronIcon className={`w-3.5 h-3.5 text-[#444] transition-transform duration-200 ${isOpen ? '' : '-rotate-90'}`} />
+      <ChevronIcon className="transition-transform duration-200" style={{ width: '0.875rem', height: '0.875rem', color: '#444', transform: isOpen ? 'rotate(0deg)' : 'rotate(-90deg)' }} />
     </button>
   );
 }
@@ -117,8 +116,8 @@ export function SectionHeader({ label, icon, isOpen, onToggle, count }) {
 // ── Form field label wrapper ──────────────────────────────────────────────────
 export function Field({ label, children }) {
   return (
-    <div className="flex flex-col gap-1">
-      <label className="text-[10px] font-semibold text-[#666] uppercase tracking-wider">{label}</label>
+    <div className="flex-col-start gap-1">
+      <label className="text-label-medium-gray" style={{ fontWeight: 600 }}>{label}</label>
       {children}
     </div>
   );
@@ -127,14 +126,14 @@ export function Field({ label, children }) {
 // ── Loading skeleton ───────────────────────────────────────────────────────────
 export function LoadingSkeleton({ rows = 4, className = '' }) {
   return (
-    <div className={`flex flex-col gap-3 animate-pulse ${className}`}>
+    <div className={`flex-col-start gap-3 animate-pulse ${className}`}>
       {Array.from({ length: rows }).map((_, i) => (
-        <div key={i} className="flex flex-col gap-2">
-          <div className="flex justify-between">
-            <div className="h-3 rounded" style={{ background: '#222', width: `${40 + (i * 17) % 35}%` }} />
-            <div className="h-3 rounded w-12" style={{ background: '#1e1e1e' }} />
+        <div key={i} className="flex-col-start gap-2">
+          <div className="flex-row-between">
+            <div className="rounded" style={{ height: '0.75rem', background: '#222', width: `${40 + (i * 17) % 35}%` }} />
+            <div className="rounded" style={{ height: '0.75rem', width: '3rem', background: '#1e1e1e' }} />
           </div>
-          <div className="h-2 rounded-full" style={{ background: '#1a1a1a' }}>
+          <div className="rounded-full" style={{ height: '0.5rem', background: '#1a1a1a', overflow: 'hidden' }}>
             <div className="h-full rounded-full" style={{ background: '#2a2a2a', width: `${30 + (i * 23) % 50}%` }} />
           </div>
         </div>
@@ -147,26 +146,26 @@ export function LoadingSkeleton({ rows = 4, className = '' }) {
 export function HBar({ data, colors, maxCount, total }) {
   const [hovered, setHovered] = useState(null);
   return (
-    <div className="flex flex-col gap-2.5">
+    <div className="flex-col-start gap-2-5">
       {data.map(([label, count], i) => {
         const pct   = ((count / maxCount) * 100).toFixed(1);
         const share = ((count / total) * 100).toFixed(0);
         const color = colors[i % colors.length];
         const isHov = hovered === i;
         return (
-          <div key={label} className="relative cursor-default"
+          <div key={label} className="relative"
                onMouseEnter={() => setHovered(i)}
                onMouseLeave={() => setHovered(null)}
                tabIndex={0} onFocus={() => setHovered(i)} onBlur={() => setHovered(null)}
                aria-label={`${label}: ${count} (${share}%)`}
-               style={{ outline: 'none' }}>
-            <div className="flex justify-between text-xs mb-1">
-              <span className="text-[#999] truncate max-w-[140px]" style={{ color: isHov ? '#fff' : undefined }}>{label}</span>
+               style={{ outline: 'none', cursor: 'default' }}>
+            <div className="flex-row-between" style={{ fontSize: '12px', marginBottom: '4px' }}>
+              <span className="truncate" style={{ color: isHov ? '#fff' : '#999', maxWidth: '140px' }}>{label}</span>
               <span className="font-mono font-bold" style={{ color }}>
-                {count} <span className="text-[#555]">({share}%)</span>
+                {count} <span style={{ color: '#555' }}>({share}%)</span>
               </span>
             </div>
-            <div className="h-2 rounded-full overflow-hidden" style={{ background: '#1e1e1e' }}>
+            <div className="rounded-full overflow-hidden" style={{ height: '0.5rem', background: '#1e1e1e' }}>
               <div className="h-full rounded-full transition-all duration-500"
                    style={{ width: `${pct}%`, background: color, opacity: isHov ? 1 : 0.85, boxShadow: isHov ? `0 0 6px ${color}88` : 'none' }} />
             </div>

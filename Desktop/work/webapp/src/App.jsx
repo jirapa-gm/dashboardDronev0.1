@@ -6,6 +6,8 @@ import AnalyticsDashboard from './components/AnalyticsDashboard';
 import TacticalMapView    from './components/TacticalMapView';
 import EventLog           from './components/EventLog';
 import { useEvents }      from './hooks/useEvents';
+import { useIsMobile }    from './hooks/useIsMobile';
+import { useSwipe }       from './hooks/useSwipe';
 import { BarChartIcon, TargetIcon, LogIcon } from './shared/icons';
 import { toDateStr }      from './shared/helpers';
 
@@ -15,32 +17,6 @@ function getDefaultDates(isMockMode) {
   const today = new Date(), week = new Date(today);
   week.setDate(today.getDate() - 7);
   return { startDate: toDateStr(week), endDate: toDateStr(today) };
-}
-
-function useIsMobile() {
-  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
-  useEffect(() => {
-    const h = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener('resize', h);
-    return () => window.removeEventListener('resize', h);
-  }, []);
-  return isMobile;
-}
-
-function useSwipe(sidebarVisible, setSidebarVisible) {
-  const startX = useRef(null), startY = useRef(null);
-  const THRESHOLD = 60;
-  const onStart = useCallback(e => { startX.current = e.touches[0].clientX; startY.current = e.touches[0].clientY; }, []);
-  const onEnd   = useCallback(e => {
-    if (startX.current === null) return;
-    const dx = e.changedTouches[0].clientX - startX.current;
-    const dy = e.changedTouches[0].clientY - startY.current;
-    startX.current = null; startY.current = null;
-    if (Math.abs(dx) < Math.abs(dy)) return;
-    if (dx >  THRESHOLD && !sidebarVisible) setSidebarVisible(true);
-    if (dx < -THRESHOLD &&  sidebarVisible) setSidebarVisible(false);
-  }, [sidebarVisible, setSidebarVisible]);
-  return { onStart, onEnd };
 }
 
 // ── เมนู ────────────────────────────────────────────────────────────────
@@ -54,20 +30,18 @@ const TABS = [
 function TabBar({ activeTab, setActiveTab, eventCount }) {
   const BADGE_COLOR = '#dd8511';
   return (
-    <div className="flex-none border-b border-[#3a3a3a] bg-[#1a1a1a] flex items-center px-4 gap-0.5 overflow-x-auto">
+    <div className="tabbar-styled">
       {TABS.map(({ id, label, Icon }) => {
         const active = activeTab === id;
         const badge  = id === 'log' ? eventCount : null;
         return (
           <button key={id} onClick={() => setActiveTab(id)} style={{ marginBottom: '-1px' }}
-            className={['flex items-center gap-1.5 px-3 py-2.5 text-[10px] font-bold uppercase tracking-wider border-b-2 transition-all whitespace-nowrap',
-              active ? 'text-orange-400 border-orange-500' : 'text-[#555] border-transparent hover:text-[#888] hover:border-[#3a3a3a]',
-            ].join(' ')}>
+            className={`tabbar-btn ${active ? 'active' : 'inactive'}`}>
             <Icon active={active} />
             <span className="hidden sm:inline">{label}</span>
             {badge !== null && (
-              <span className="text-[8px] px-1.5 py-0.5 rounded font-semibold"
-                    style={{ background: active ? `${BADGE_COLOR}20` : '#1a1a1a', color: active ? BADGE_COLOR : '#555', border: `1px solid ${active ? `${BADGE_COLOR}40` : '#2a2a2a'}` }}>
+              <span className="rounded font-semibold"
+                    style={{ fontSize: '8px', padding: '2px 6px', background: active ? `${BADGE_COLOR}20` : '#1a1a1a', color: active ? BADGE_COLOR : '#555', border: `1px solid ${active ? `${BADGE_COLOR}40` : '#2a2a2a'}` }}>
                 {badge}
               </span>
             )}
@@ -83,26 +57,21 @@ function Breadcrumb({ activeGroup, activeSubgroup, activeDetector, onReset, onRe
   const showDetector = activeDetector !== 'ALL';
   const showSubgroup = !showDetector && activeSubgroup !== 'ALL';
   const showGroup    = !showDetector && !showSubgroup && activeGroup !== 'ALL';
-  const Sep = () => <span className="text-[#3a3a3a]">/</span>;
-  const Crumb = ({ label, onClick }) => (
-    <button onClick={onClick} className="text-[10px] text-[#666] hover:text-orange-400 transition-colors font-bold uppercase tracking-widest">{label}</button>
-  );
-  const Active = ({ label }) => <span className="text-[10px] text-orange-400 font-bold uppercase tracking-widest">{label}</span>;
-  const Sub    = ({ label }) => <span className="text-[9px] text-[#555] ml-1">{label}</span>;
+  const Sep = () => <span style={{ color: '#3a3a3a' }}>/</span>;
 
   return (
-    <div className="flex-none border-b border-[#3a3a3a] bg-[#1a1a1a] flex items-center px-4 py-2 gap-3">
-      <button onClick={onReset} className="flex items-center gap-1.5 text-[10px] text-[#666] hover:text-orange-400 transition-colors">
-        <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+    <div className="breadcrumb-container">
+      <button onClick={onReset} className="breadcrumb-back">
+        <svg style={{ width: '0.75rem', height: '0.75rem' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
         Back
       </button>
 
-      {showGroup    && <><Sep/><Active label={activeGroup}    /><Sub label="Group Summary"    /></>}
-      {showSubgroup && <><Sep/><Active label={activeGroup}    /><Sep/><Active label={activeSubgroup} /><Sub label="Subgroup Summary" /></>}
+      {showGroup    && <><Sep/><span className="breadcrumb-active">{activeGroup}</span><span style={{ fontSize: '9px', color: '#555', marginLeft: '0.25rem' }}>Group Summary</span></>}
+      {showSubgroup && <><Sep/><span className="breadcrumb-active">{activeGroup}</span><Sep/><span className="breadcrumb-active">{activeSubgroup}</span><span style={{ fontSize: '9px', color: '#555', marginLeft: '0.25rem' }}>Subgroup Summary</span></>}
       {showDetector && <>
-        <Sep/><Crumb label={activeGroup}    onClick={onReset} />
-        <Sep/><Crumb label={activeSubgroup} onClick={onResetToGroup} />
-        <Sep/><Active label={activeDetector} /><Sub label="Detector Summary" />
+        <Sep/><button onClick={onReset} className="breadcrumb-crumb">{activeGroup}</button>
+        <Sep/><button onClick={onResetToGroup} className="breadcrumb-crumb">{activeSubgroup}</button>
+        <Sep/><span className="breadcrumb-active">{activeDetector}</span><span style={{ fontSize: '9px', color: '#555', marginLeft: '0.25rem' }}>Detector Summary</span>
       </>}
     </div>
   );
@@ -114,9 +83,8 @@ function SwipeHint() {
   useEffect(() => { const t = setTimeout(() => setVisible(false), 3000); return () => clearTimeout(t); }, []);
   if (!visible) return null;
   return (
-    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-[#1e1e1e] border border-[#3a3a3a] rounded-full px-4 py-2 text-[10px] text-[#888] flex items-center gap-2 z-50 shadow-xl pointer-events-none"
-         style={{ animation: 'fadeInOut 3s ease forwards' }}>
-      <svg className="w-3 h-3 text-orange-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <div className="swipe-hint-container" style={{ animation: 'fadeInOut 3s ease forwards' }}>
+      <svg style={{ width: '0.75rem', height: '0.75rem', color: '#fb923c' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <polyline points="9 18 15 12 9 6"/>
       </svg>
       Swipe right to open filters
@@ -167,7 +135,7 @@ export default function App() {
   const showSummary  = showDetector || showSubgroup || showGroup;
 
   return (
-    <div className="min-h-screen w-full bg-[#141414] text-[#ccc] font-sans flex flex-col"
+    <div className="app-container"
          onTouchStart={isMobile ? onStart : undefined}
          onTouchEnd={isMobile   ? onEnd   : undefined}>
 
@@ -177,7 +145,7 @@ export default function App() {
       {/* TabBar is always visible — no longer replaced by Breadcrumb */}
       <TabBar activeTab={activeTab} setActiveTab={setActiveTab} eventCount={events.length} />
 
-      <main className="flex-1 flex flex-row overflow-hidden relative">
+      <main className="main-content">
 
         {/* Sidebar — always present on Analytics tab */}
         <Sidebar events={events} isLoading={isLoading} onSearch={handleSearch}
@@ -185,10 +153,10 @@ export default function App() {
                  visible={sidebarVisible && activeTab === 'analytics'} activeDetector={activeDetector} />
 
         {isMobile && sidebarVisible && activeTab === 'analytics' && (
-          <div className="absolute inset-0 bg-black/50 z-30" onClick={() => setSidebarVisible(false)} />
+          <div className="backdrop-overlay" onClick={() => setSidebarVisible(false)} />
         )}
 
-        <div className="flex-1 overflow-hidden flex flex-col min-w-0">
+        <div className="content-pane">
 
           {/* ── Analytics tab ── sidebar stays, breadcrumb lives inside content */}
           {activeTab === 'analytics' && <>

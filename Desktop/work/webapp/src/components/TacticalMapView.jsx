@@ -56,6 +56,7 @@ function buildDetectors(events) {
   return Object.values(map);
 }
 
+// Compute boundaries
 function computeRadarBounds(detectors) {
   if (!detectors.length) return { lat: 13.7563, lon: 100.5018, radiusM: 4000 };
   const avgLat = detectors.reduce((s, d) => s + d.lat, 0) / detectors.length;
@@ -83,7 +84,6 @@ function makeDetectorIcon(color) {
 }
 
 function makeDroneDotIcon(color, isAlert) {
-  // normal = 18px radius, alert = 22px radius — clearly visible on map
   const s = isAlert ? 22 : 18, t = s * 2;
   const pulse = isAlert
     ? `<circle cx="${s}" cy="${s}" r="${s - 2}" fill="${color}" opacity="0.18">
@@ -91,7 +91,6 @@ function makeDroneDotIcon(color, isAlert) {
          <animate attributeName="opacity" values="0.18;0;0.18" dur="1.4s" repeatCount="indefinite"/>
        </circle>`
     : '';
-  // outer glow ring
   const glow = `<circle cx="${s}" cy="${s}" r="${s - 3}" fill="none" stroke="${color}" stroke-width="1.5" opacity="0.35"/>`;
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${t}" height="${t}" viewBox="0 0 ${t} ${t}">
     ${pulse}
@@ -159,7 +158,6 @@ class SweepLayer {
     this._c = center; this._r = radiusM; this._angleDeg = 0; this._lastTime = null;
     this._raf = null; this._canvas = null; this._map = null;
     this._SPEED = 45;
-    // bind handlers so we can remove them
     this._onViewChange = this._onViewChange.bind(this);
   }
   onAdd(map) {
@@ -167,7 +165,6 @@ class SweepLayer {
     this._canvas = document.createElement('canvas');
     this._canvas.style.cssText = 'position:absolute;top:0;left:0;pointer-events:none;z-index:400;';
     map.getPanes().overlayPane.appendChild(this._canvas);
-    // listen to ALL events that change the canvas-to-latLng mapping
     map.on('move zoom viewreset resize moveend zoomend', this._onViewChange, this);
     this._resize(); this._lastTime = performance.now();
     this._raf = requestAnimationFrame(t => this._tick(t));
@@ -180,13 +177,11 @@ class SweepLayer {
   }
   _onViewChange() {
     this._resize();
-    // no need to call _draw here — _tick loop handles continuous redraw
   }
   _resize() {
     if (!this._map || !this._canvas) return;
     const s = this._map.getSize();
     this._canvas.width = s.x; this._canvas.height = s.y;
-    // Reset canvas position to map origin on every resize/move
     const origin = this._map.containerPointToLayerPoint([0, 0]);
     window.L.DomUtil.setPosition(this._canvas, origin);
   }
@@ -200,7 +195,6 @@ class SweepLayer {
     if (!this._map || !this._canvas) return;
     const cv = this._canvas, ctx = cv.getContext('2d');
     const s = this._map.getSize(); ctx.clearRect(0, 0, s.x, s.y);
-    // Always recompute pixel position from lat/lon each frame so it tracks the map
     const cp = this._map.latLngToContainerPoint([this._c.lat, this._c.lon]);
     const ep = this._map.latLngToContainerPoint([this._c.lat + this._r / 111320, this._c.lon]);
     const rPx = Math.abs(cp.y - ep.y);
@@ -400,7 +394,6 @@ const MAP_CSS = `
 export default function TacticalMapView({ events, isLoading }) {
   const [filterGroup, setFilterGroup] = useState('ALL');
   const [showSweep,   setShowSweep]   = useState(true);
-  // radarMode: 'none' | 'global' | '<detectorId>'
   const [radarMode,   setRadarMode]   = useState('none');
 
   const mapRef        = useRef(null);
@@ -421,7 +414,6 @@ export default function TacticalMapView({ events, isLoading }) {
       const map = window.L.map(mapRef.current, { center: [radarBound.lat, radarBound.lon], zoom: 12, zoomControl: true });
       window.L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: '&copy; OSM &copy; CARTO', subdomains: 'abcd', maxZoom: 19 }).addTo(map);
       leafletMap.current = map;
-      // force re-render to trigger overlay effect
       setShowSweep(v => v);
     });
     return () => { if (leafletMap.current) { leafletMap.current.remove(); leafletMap.current = null; } };
@@ -438,10 +430,8 @@ export default function TacticalMapView({ events, isLoading }) {
 
     // ── Draw radar based on mode ──
     if (radarMode === 'global' && detectors.length > 0) {
-      // Global overview: static radar rings only, no sweep
       radarRefs.current = drawGlobalRadar(map, L, radarBound, radarBound.radiusM, filtered);
     } else if (radarMode !== 'none' && radarMode !== 'global') {
-      // Per-detector radar: rings + sweep anchored to that detector
       const det = detectors.find(d => d.id === radarMode);
       if (det) {
         radarRefs.current = drawDetectorRadar(map, L, det);
@@ -457,7 +447,7 @@ export default function TacticalMapView({ events, isLoading }) {
       }
     }
 
-    // ── Detector markers (always visible, no popup — tooltip on hover, radar on click) ──
+    // ── Detector markers ──
     detectors.forEach(det => {
       const color = GROUP_COLORS[det.group] ?? '#f97316';
       const mk = L.marker([det.lat, det.lon], { icon: makeDetectorIcon(color), zIndexOffset: 500 })
@@ -468,7 +458,6 @@ export default function TacticalMapView({ events, isLoading }) {
         .addTo(map);
 
       mk.on('click', () => {
-        // Toggle: click same detector → close radar; click different → open its radar
         setRadarMode(prev => prev === det.id ? 'none' : det.id);
       });
 
@@ -500,24 +489,24 @@ export default function TacticalMapView({ events, isLoading }) {
   }, [leafletMap.current, filtered.length, filterGroup, events, showSweep, radarMode, detectors.length]);
 
   return (
-    <div className="flex flex-col h-full" style={{ background: '#0a0a0a' }}>
+    <div className="flex-col-start h-full" style={{ background: '#0a0a0a' }}>
       <style>{MAP_CSS}</style>
 
       <Toolbar>
-        <div className="flex items-center gap-2">
-          <TargetIcon className="w-4 h-4 text-orange-500" />
-          <span className="text-sm font-bold text-white">Tactical Map</span>
-          <span className="text-[11px] px-2.5 py-0.5 rounded-full font-bold" style={{ background: 'rgba(249,115,22,.12)', color: '#f97316', border: '1px solid rgba(249,115,22,.35)' }}>{filtered.length} targets</span>
-          {alertCount > 0 && <span className="text-[11px] px-2.5 py-0.5 rounded-full font-bold animate-pulse" style={{ background: 'rgba(239,68,68,.12)', color: '#ef4444', border: '1px solid rgba(239,68,68,.4)' }}>🚨 {alertCount} CRITICAL</span>}
+        <div className="flex-row-center gap-2">
+          <TargetIcon style={{ width: '1rem', height: '1rem', color: '#f97316' }} />
+          <span style={{ fontSize: '14px', fontWeight: 'bold', color: '#fff' }}>Tactical Map</span>
+          <span className="rounded-full font-bold" style={{ fontSize: '11px', padding: '2px 10px', background: 'rgba(249,115,22,.12)', color: '#f97316', border: '1px solid rgba(249,115,22,.35)' }}>{filtered.length} targets</span>
+          {alertCount > 0 && <span className="rounded-full font-bold animate-pulse" style={{ fontSize: '11px', padding: '2px 10px', background: 'rgba(239,68,68,.12)', color: '#ef4444', border: '1px solid rgba(239,68,68,.4)' }}>🚨 {alertCount} CRITICAL</span>}
         </div>
 
         {/* Layer toggles */}
-        <div className="flex items-center gap-1.5 flex-wrap">
+        <div className="flex-row-center gap-1-5 flex-wrap">
           {/* Sweep toggle */}
           {radarMode !== 'global' && (
             <button onClick={() => setShowSweep(v => !v)}
-              className="text-[10px] px-3 py-1.5 rounded-full font-bold transition-all"
-              style={{ background: showSweep ? '#22c55e18' : '#1a1a1a', border: `1px solid ${showSweep ? '#22c55e' : '#2a2a2a'}`, color: showSweep ? '#22c55e' : '#555' }}>
+              className="rounded-full font-bold transition-all"
+              style={{ fontSize: '10px', padding: '6px 12px', background: showSweep ? '#22c55e18' : '#1a1a1a', border: `1px solid ${showSweep ? '#22c55e' : '#2a2a2a'}`, color: showSweep ? '#22c55e' : '#555', cursor: 'pointer' }}>
               Sweep
             </button>
           )}
@@ -525,24 +514,26 @@ export default function TacticalMapView({ events, isLoading }) {
           {/* Global radar overview button */}
           <button
             onClick={() => setRadarMode(prev => prev === 'global' ? 'none' : 'global')}
-            className="text-[10px] px-3 py-1.5 rounded-full font-bold transition-all"
+            className="rounded-full font-bold transition-all"
             style={{
+              fontSize: '10px', padding: '6px 12px',
               background: radarMode === 'global' ? 'rgba(59,130,246,0.18)' : '#1a1a1a',
               border: `1px solid ${radarMode === 'global' ? '#3b82f6' : '#2a2a2a'}`,
-              color: radarMode === 'global' ? '#3b82f6' : '#555'
+              color: radarMode === 'global' ? '#3b82f6' : '#555',
+              cursor: 'pointer'
             }}>
             🌐 All Radars
           </button>
         </div>
 
-        <div className="flex gap-1.5 ml-auto flex-wrap items-center">
+        <div className="flex-row-center gap-1-5 ml-auto flex-wrap">
           {['ALL', 'GA', 'GB'].map(g => {
             const active = filterGroup === g, color = g === 'GA' ? GA : g === 'GB' ? GB : '#64748b';
             const count = g === 'ALL' ? events.length : events.filter(e => e.group === g).length;
             return (
               <button key={g} onClick={() => setFilterGroup(g)}
-                className="text-[11px] px-3.5 py-1.5 rounded-full font-bold transition-all"
-                style={{ background: active ? `${color}18` : '#1a1a1a', border: `1px solid ${active ? color : '#2a2a2a'}`, color: active ? color : '#555', boxShadow: active ? `0 0 10px ${color}25` : 'none' }}>
+                className="rounded-full font-bold transition-all"
+                style={{ fontSize: '11px', padding: '6px 14px', background: active ? `${color}18` : '#1a1a1a', border: `1px solid ${active ? color : '#2a2a2a'}`, color: active ? color : '#555', boxShadow: active ? `0 0 10px ${color}25` : 'none', cursor: 'pointer' }}>
                 {g === 'ALL' ? `All (${count})` : `${g} (${count})`}
               </button>
             );
@@ -552,56 +543,54 @@ export default function TacticalMapView({ events, isLoading }) {
 
       <div className="flex-1 relative overflow-hidden">
         {isLoading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/60 z-[1000] backdrop-blur-sm">
-            <div className="flex flex-col items-center gap-3">
-              <div className="w-8 h-8 border-2 border-[#2a2a2a] border-t-orange-500 rounded-full animate-spin" />
-              <span className="text-[12px] text-[#555] uppercase tracking-widest">Loading…</span>
+          <div className="loading-overlay">
+            <div className="flex-col-center gap-3">
+              <div className="spinner-circle animate-spin" />
+              <span className="text-label-medium-gray" style={{ fontSize: 12 }}>Loading…</span>
             </div>
           </div>
         )}
         <div ref={mapRef} style={{ width: '100%', height: '100%' }} />
 
         {/* Legend */}
-        <div className="absolute bottom-8 left-3 z-[999] rounded-xl px-4 py-3 flex flex-col gap-2 shadow-xl pointer-events-none"
-          style={{ background: 'rgba(14,14,14,0.92)', border: '1px solid #2a2a2a', backdropFilter: 'blur(8px)' }}>
-          <span className="text-[9px] text-[#555] uppercase tracking-widest font-bold mb-0.5">Radar Zones</span>
+        <div className="legend-box" style={{ background: 'rgba(14,14,14,0.92)', border: '1px solid #2a2a2a', backdropFilter: 'blur(8px)' }}>
+          <span style={{ fontSize: 9, color: '#555', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 'bold', marginBottom: 2 }}>Radar Zones</span>
           {[['CRITICAL', '#ef4444', '< 20%'], ['DANGER', '#f97316', '< 40%'], ['WARNING', '#eab308', '< 60%'], ['CAUTION', '#22c55e', '< 80%'], ['BOUNDARY', '#3b82f6', 'outer']].map(([l, c, h]) => (
-            <div key={l} className="flex items-center gap-2.5">
-              <div className="w-3 h-3 rounded-sm" style={{ background: c, opacity: .75 }} />
-              <span className="text-[10px] font-bold font-mono" style={{ color: c }}>{l}</span>
-              <span className="text-[9px] text-[#444] ml-auto">{h}</span>
+            <div key={l} className="flex-row-center gap-2-5">
+              <div className="rounded" style={{ background: c, opacity: .75, width: 12, height: 12 }} />
+              <span className="font-mono" style={{ fontSize: 10, fontWeight: 'bold', color: c }}>{l}</span>
+              <span style={{ fontSize: 9, color: '#444', marginLeft: 'auto' }}>{h}</span>
             </div>
           ))}
-          <div className="border-t border-[#2a2a2a] pt-2 mt-1 flex flex-col gap-1.5">
+          <div className="flex-col-start gap-1-5" style={{ borderTop: '1px solid #2a2a2a', paddingTop: 8, marginTop: 4 }}>
             {[['#ef4444', 'Critical drone (< 100m)'], ['#22c55e', 'Safe drone'], ['#f97316', 'Detector']].map(([c, l]) => (
-              <div key={l} className="flex items-center gap-2">
-                <div className="w-2.5 h-2.5 rounded-full" style={{ background: c, opacity: .85 }} />
-                <span className="text-[9px] text-[#555]">{l}</span>
+              <div key={l} className="flex-row-center gap-2">
+                <div className="rounded-full" style={{ background: c, opacity: .85, width: 10, height: 10 }} />
+                <span style={{ fontSize: 9, color: '#555' }}>{l}</span>
               </div>
             ))}
           </div>
-          <div className="border-t border-[#2a2a2a] pt-2 mt-1">
-            <div className="text-[9px] text-[#444]">Click detector → show its radar</div>
-            <div className="text-[9px] text-[#444]">Click drone dot → details</div>
+          <div style={{ borderTop: '1px solid #2a2a2a', paddingTop: 8, marginTop: 4 }}>
+            <div style={{ fontSize: 9, color: '#444' }}>Click detector → show its radar</div>
+            <div style={{ fontSize: 9, color: '#444' }}>Click drone dot → details</div>
           </div>
         </div>
 
         {/* Live stats overlay */}
         {filtered.length > 0 && (
-          <div className="absolute top-3 right-3 z-[999] rounded-xl px-4 py-3 flex flex-col gap-1.5 shadow-xl pointer-events-none"
-            style={{ background: 'rgba(14,14,14,0.92)', border: '1px solid #2a2a2a', backdropFilter: 'blur(8px)', minWidth: '150px' }}>
+          <div className="stats-overlay-box" style={{ background: 'rgba(14,14,14,0.92)', border: '1px solid #2a2a2a', backdropFilter: 'blur(8px)', minWidth: '150px' }}>
             {[['Targets', filtered.length, '#f97316'], ['Detectors', detectors.length, '#3b82f6'], ['Critical', alertCount, '#ef4444'],
               ['No GPS', filtered.filter(e => !e.has_gps).length, '#eab308'],
               ['GA', filtered.filter(e => e.group === 'GA').length, '#f97316'],
               ['GB', filtered.filter(e => e.group === 'GB').length, '#eab308']].map(([l, v, c]) => (
-              <div key={l} className="flex items-center justify-between gap-4">
-                <span className="text-[11px] text-[#555]">{l}</span>
-                <span className="text-[13px] font-bold font-mono" style={{ color: c }}>{v}</span>
+              <div key={l} className="flex-row-between gap-4">
+                <span style={{ fontSize: 11, color: '#555' }}>{l}</span>
+                <span className="font-mono" style={{ fontSize: 13, fontWeight: 'bold', color: c }}>{v}</span>
               </div>
             ))}
             {radarMode !== 'none' && (
-              <div className="border-t border-[#222] pt-1.5 mt-0.5">
-                <div className="text-[9px] font-bold font-mono" style={{ color: radarMode === 'global' ? '#3b82f6' : '#f97316' }}>
+              <div style={{ borderTop: '1px solid #222', paddingTop: 6, marginTop: 2 }}>
+                <div className="font-mono" style={{ fontSize: 9, fontWeight: 'bold', color: radarMode === 'global' ? '#3b82f6' : '#f97316' }}>
                   {radarMode === 'global' ? '🌐 Global overview' : `📡 ${radarMode}`}
                 </div>
               </div>

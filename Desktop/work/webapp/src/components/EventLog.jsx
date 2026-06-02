@@ -3,6 +3,7 @@ import { THREAT_COLOR, GA, GB } from '../shared/constants';
 import { distColor, dirLabel, getProtocolColor, formatDate } from '../shared/helpers';
 import { SearchIcon, DownloadIcon, TableIcon } from '../shared/icons';
 import { Spinner, Toolbar } from '../shared/ui';
+import DroneHistoryPanel from './DroneHistoryPanel';
 
 // ── CSV export (exports same aggregated droneStats as the table) ──────────────
 function exportCSV(droneStats) {
@@ -33,358 +34,6 @@ function exportCSV(droneStats) {
   URL.revokeObjectURL(url);
 }
 
-
-// ── Altitude gauge ─────────────────────────────────────────────────────────────
-function AltitudeGauge({ height, maxHeight = 500 }) {
-  const pct   = Math.min((height ?? 0) / maxHeight, 1);
-  const color = pct > 0.7 ? '#ef4444' : pct > 0.4 ? '#f97316' : '#22c55e';
-  return (
-    <div className="flex flex-col items-center gap-1" style={{ width: 52 }}>
-      <span className="text-[9px] text-[#555] uppercase tracking-widest">Alt</span>
-      <div className="relative flex flex-col-reverse" style={{ width: 28, height: 90, background: '#111', borderRadius: 6, border: '1px solid #2a2a2a', overflow: 'visible' }}>
-        <div style={{ width: '100%', height: `${pct * 100}%`, background: `linear-gradient(to top, ${color}cc, ${color}44)`, borderRadius: 4, transition: 'height 0.5s ease' }} />
-        {[0, 100, 200, 300, 400, 500].map(t => (
-          <div key={t} style={{ position: 'absolute', bottom: `${(t / maxHeight) * 100}%`, left: 0, right: 0, borderTop: '1px solid #2a2a2a', pointerEvents: 'none' }}>
-            <span style={{ position: 'absolute', right: -28, top: -5, fontSize: 7, color: '#444', fontFamily: 'monospace', whiteSpace: 'nowrap' }}>{t}m</span>
-          </div>
-        ))}
-      </div>
-      <span className="text-[11px] font-bold font-mono" style={{ color }}>{height ?? '—'}m</span>
-    </div>
-  );
-}
-
-// ── Signal sparkline ──────────────────────────────────────────────────────────
-function SignalSparkline({ detections, width = 160, height = 36 }) {
-  const [tooltip, setTooltip] = useState(null);
-  const svgRef = useRef(null);
-  if (!detections || detections.length < 2) return null;
-
-  const values = detections.map(d => d.rssi_dbm ?? -90);
-  const times  = detections.map(d => new Date(d.datetime).getTime());
-  const minV = Math.min(...values), maxV = Math.max(...values), range = maxV - minV || 1;
-  const minT = Math.min(...times),  maxT = Math.max(...times),  timeRange = maxT - minT || 1;
-
-  const px = t => ((t - minT) / timeRange) * (width - 8) + 4;
-  const py = v => height - 4 - ((v - minV) / range) * (height - 8);
-  const pts = detections.map((d, i) => `${px(times[i])},${py(values[i])}`).join(' ');
-
-  return (
-    <div className="relative" style={{ width, height: height + 16 }}>
-      <div className="text-[8px] text-[#444] mb-0.5 uppercase tracking-widest">RSSI over time</div>
-      <svg ref={svgRef} width={width} height={height} style={{ display: 'block', overflow: 'visible' }}
-           onMouseMove={e => {
-             const rect = svgRef.current.getBoundingClientRect();
-             const t = minT + ((e.clientX - rect.left) / width) * timeRange;
-             let ci = 0, minD = Infinity;
-             times.forEach((tt, i) => { const d = Math.abs(tt - t); if (d < minD) { minD = d; ci = i; } });
-             setTooltip({ x: px(times[ci]), y: py(values[ci]), val: values[ci], time: detections[ci].datetime?.slice(11,16) });
-           }}
-           onMouseLeave={() => setTooltip(null)}>
-        <polyline points={pts} fill="none" stroke="#22c55e" strokeWidth="1.5" opacity="0.8"/>
-        {detections.map((d, i) => <circle key={i} cx={px(times[i])} cy={py(values[i])} r="2.5" fill="#22c55e" opacity="0.7"/>)}
-        {tooltip && (
-          <>
-            <line x1={tooltip.x} y1={0} x2={tooltip.x} y2={height} stroke="#fff" strokeWidth="0.5" opacity="0.3"/>
-            <circle cx={tooltip.x} cy={tooltip.y} r="4" fill="#22c55e" stroke="#fff" strokeWidth="1"/>
-            <rect x={tooltip.x + 6} y={tooltip.y - 14} width={56} height={18} rx="3" fill="rgba(20,20,20,0.92)" stroke="#333"/>
-            <text x={tooltip.x + 9} y={tooltip.y - 2} fill="#ccc" fontSize="8" fontFamily="monospace">{tooltip.val} dBm {tooltip.time}</text>
-          </>
-        )}
-      </svg>
-    </div>
-  );
-}
-
-// ── 7-day detection timeline ──────────────────────────────────────────────────
-function DetectionTimeline({ detections }) {
-  const [hover, setHover] = useState(null);
-  if (!detections?.length) return null;
-
-  const sorted = [...detections].sort((a, b) => new Date(a.datetime) - new Date(b.datetime));
-  const sessions = [];
-  let cur = null;
-  sorted.forEach(d => {
-    const t = new Date(d.datetime).getTime();
-    if (!cur || t - cur.end > 5 * 60 * 1000) {
-      if (cur) sessions.push(cur);
-      cur = { start: t, end: t, events: [d], detectors: new Set([d.detector_id]) };
-    } else { cur.end = t; cur.events.push(d); cur.detectors.add(d.detector_id); }
-  });
-  if (cur) sessions.push(cur);
-
-  const now = Date.now(), windowMs = 7 * 24 * 60 * 60 * 1000, minT = now - windowMs;
-  const toX = t => Math.max(0, Math.min(100, ((t - minT) / windowMs) * 100));
-  const dayLabels = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(now - i * 86400000); d.setHours(0,0,0,0);
-    return { x: toX(d.getTime()), label: `${d.getMonth()+1}/${d.getDate()}` };
-  }).reverse();
-
-  // Format time helper
-  const fmtTime = ms => {
-    const min = Math.round(ms / 60000);
-    if (min < 1) return '< 1 min';
-    if (min < 60) return `${min} min`;
-    return `${Math.floor(min/60)}h ${min%60}m`;
-  };
-  const fmtHHMM = ts => new Date(ts).toLocaleString('th-TH', { hour:'2-digit', minute:'2-digit' });
-  const fmtDate = ts => new Date(ts).toLocaleString('th-TH', { month:'2-digit', day:'2-digit' });
-
-  const totalMs = sessions.reduce((s, ss) => s + (ss.end - ss.start), 0);
-
-  return (
-    <div className="flex flex-col gap-1.5">
-      <div className="text-[9px] text-[#555] uppercase tracking-widest font-bold">7-Day Detection Timeline</div>
-
-      {/* Timeline bar */}
-      <div className="relative" style={{ height: 28, background: '#0d0d0d', borderRadius: 6, border: '1px solid #1e1e1e' }}>
-        {dayLabels.map((dl, i) => (
-          <div key={i} style={{ position: 'absolute', left: `${dl.x}%`, top: 0, bottom: 0, borderLeft: '1px solid #1e1e1e', pointerEvents: 'none' }}>
-            <span style={{ position: 'absolute', bottom: -14, left: 2, fontSize: 8, color: '#333', whiteSpace: 'nowrap', fontFamily: 'monospace' }}>{dl.label}</span>
-          </div>
-        ))}
-        {sessions.map((s, i) => (
-          <div key={i} style={{ position: 'absolute', left: `${toX(s.start)}%`, width: `${Math.max(toX(s.end) - toX(s.start), 0.5)}%`, top: 4, bottom: 4, background: s.events.some(e => (e.estimated_distance_m ?? 999) < 100) ? '#ef4444' : '#f97316', borderRadius: 3, opacity: hover === i ? 1 : 0.75, cursor: 'pointer', transition: 'opacity 0.15s', zIndex: 2 }}
-               onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)} />
-        ))}
-        {hover !== null && sessions[hover] && (() => {
-          const s = sessions[hover];
-          const x1 = toX(s.start);
-          const dMs = s.end - s.start;
-          return (
-            <div style={{ position:'absolute', left:`${Math.min(x1,60)}%`, top:-52, background:'rgba(14,14,14,0.97)', border:'1px solid #333', borderRadius:7, padding:'5px 9px', zIndex:10, pointerEvents:'none', minWidth:150, boxShadow:'0 6px 20px rgba(0,0,0,0.7)' }}>
-              <div style={{ fontSize:9, color:'#f97316', fontWeight:700, marginBottom:2, fontFamily:'monospace' }}>#{hover+1} · {fmtTime(dMs)}</div>
-              <div style={{ fontSize:9, color:'#777', fontFamily:'monospace' }}>{fmtDate(s.start)} {fmtHHMM(s.start)} → {fmtHHMM(s.end)}</div>
-              <div style={{ fontSize:9, color:'#666', marginTop:2 }}>Events: <b style={{ color:'#ccc' }}>{s.events.length}</b></div>
-            </div>
-          );
-        })()}
-      </div>
-
-      {/* Day label spacer */}
-      <div style={{ height: 14 }} />
-
-      {/* Session duration summary cards */}
-      <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-          <span style={{ fontSize:9, color:'#555', textTransform:'uppercase', letterSpacing:'0.12em', fontFamily:'monospace', fontWeight:700 }}>Detection Sessions</span>
-          <span style={{ fontSize:9, color:'#888', fontFamily:'monospace' }}>รวม {fmtTime(totalMs)}</span>
-        </div>
-        {sessions.map((s, i) => {
-          const dMs   = s.end - s.start;
-          const dMin  = Math.round(dMs / 60000);
-          const isCrit = s.events.some(e => (e.estimated_distance_m ?? 999) < 100);
-          const color  = isCrit ? '#ef4444' : '#f97316';
-          const barW   = sessions.length > 1 ? Math.max((dMs / (sessions.reduce((a,b) => a + (b.end - b.start), 0) || 1)) * 100, 4) : 100;
-          return (
-            <div key={i} style={{ background:'#111', border:`1px solid ${color}22`, borderRadius:7, padding:'7px 10px' }}>
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:5 }}>
-                <div style={{ display:'flex', alignItems:'center', gap:7 }}>
-                  <div style={{ width:6, height:6, borderRadius:'50%', background:color, flexShrink:0 }} />
-                  <span style={{ fontSize:10, fontWeight:700, color:'#ccc', fontFamily:'monospace' }}>
-                    {fmtDate(s.start)} {fmtHHMM(s.start)}
-                    <span style={{ color:'#555', margin:'0 4px' }}>→</span>
-                    {fmtHHMM(s.end)}
-                  </span>
-                </div>
-                <span style={{ fontSize:13, fontWeight:800, color, fontFamily:'monospace' }}>
-                  {dMin < 1 ? '< 1' : dMin} <span style={{ fontSize:9, fontWeight:500, color:'#666' }}>min</span>
-                </span>
-              </div>
-              <div style={{ height:3, background:'#1e1e1e', borderRadius:2, overflow:'hidden' }}>
-                <div style={{ height:'100%', width:`${barW}%`, background:color, borderRadius:2, opacity:0.7 }} />
-              </div>
-              <div style={{ display:'flex', justifyContent:'space-between', marginTop:4 }}>
-                <span style={{ fontSize:8, color:'#555', fontFamily:'monospace' }}>{s.events.length} events · {[...s.detectors].length} detector{[...s.detectors].length>1?'s':''}</span>
-                {isCrit && <span style={{ fontSize:8, color:'#ef4444', fontWeight:700 }}>⚠ CLOSE RANGE</span>}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-// ── Drone detail modal ────────────────────────────────────────────────────────
-function DroneHistoryPanel({ droneId, allEvents, onClose }) {
-  const detections = useMemo(() => {
-    if (!droneId) return [];
-    return allEvents.filter(e => e.drone_id === droneId)
-      .sort((a, b) => new Date(b.datetime) - new Date(a.datetime));
-  }, [droneId, allEvents]);
-
-  if (!droneId) return null;
-
-  const latest    = detections[0];
-  const gc        = latest?.group === 'GA' ? GA : GB;
-  const tc        = THREAT_COLOR[latest?.threat] ?? '#888';
-
-  // ── computed stats ──────────────────────────────────────────────────────────
-  const n         = detections.length;
-  const avgSpeed  = n ? parseFloat((detections.reduce((s,d) => s+(d.speed??0), 0)/n).toFixed(2)) : 0;
-  const maxSpeed  = n ? Math.max(...detections.map(d => d.speed ?? 0)) : 0;
-  const avgHeight = n ? Math.round(detections.reduce((s,d) => s+(d.height??0), 0)/n) : 0;
-  const maxHeight = n ? Math.max(...detections.map(d => d.height ?? 0)) : 0;
-  const avgDist   = n ? Math.round(detections.reduce((s,d) => s+(d.estimated_distance_m??0), 0)/n) : 0;
-  const minDist   = n ? Math.min(...detections.map(d => d.estimated_distance_m ?? 9999)) : 0;
-  const avgRssi   = n ? parseFloat((detections.reduce((s,d) => s+(d.rssi_dbm??0), 0)/n).toFixed(1)) : 0;
-  const avgSnr    = n ? parseFloat((detections.reduce((s,d) => s+(d.snr_db??0), 0)/n).toFixed(1)) : 0;
-  const sorted_t  = [...detections].sort((a,b) => new Date(a.datetime)-new Date(b.datetime));
-  const firstSeen = sorted_t[0]?.datetime ?? null;
-  const lastSeen  = latest?.datetime ?? null;
-  const detectorIds = [...new Set(detections.map(d => d.detector_id))];
-  const uniqueFreqs = [...new Set(detections.map(d => d.freq).filter(Boolean))].sort().join(', ');
-  const protocols   = [...new Set(detections.map(d => d.protocol_name).filter(Boolean))].join(', ');
-  const directions  = [...new Set(detections.map(d => d.direction).filter(Boolean))];
-  const topDir      = directions.length === 1 ? directions[0] : (latest?.direction ?? dirLabel(latest?.aoa_degrees) ?? '—');
-  const hasGps      = latest?.has_gps;
-  const registered  = latest?.registered;
-
-  // ── field component ─────────────────────────────────────────────────────────
-  const F = ({ label, value, color, span }) => (
-    <div style={{
-      background:'#1a1a1a', border:'1px solid #262626', borderRadius:8,
-      padding:'9px 13px', gridColumn: span ? 'span 2' : undefined,
-    }}>
-      <div style={{ fontSize:9, color:'#555', textTransform:'uppercase', letterSpacing:'0.12em', marginBottom:5, fontFamily:'monospace' }}>{label}</div>
-      <div style={{ fontSize:14, fontWeight:700, fontFamily:'monospace', color: color ?? '#c8c8c8', lineHeight:1.2 }}>{value ?? '—'}</div>
-    </div>
-  );
-
-  const Divider = ({ label }) => (
-    <div style={{ display:'flex', alignItems:'center', gap:8, margin:'4px 0' }}>
-      <div style={{ flex:1, height:1, background:'#2a2a2a' }} />
-      <span style={{ fontSize:9, color:'#666', textTransform:'uppercase', letterSpacing:'0.14em', fontFamily:'monospace', fontWeight:700 }}>{label}</span>
-      <div style={{ flex:1, height:1, background:'#2a2a2a' }} />
-    </div>
-  );
-
-  return (
-    <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/75"
-         onClick={onClose} style={{ backdropFilter:'blur(3px)' }}>
-      <div onClick={e => e.stopPropagation()}
-           style={{ background:'#131313', border:'1px solid #252525', borderRadius:16,
-                    width:420, maxWidth:'93vw', maxHeight:'92vh',
-                    display:'flex', flexDirection:'column',
-                    boxShadow:'0 40px 100px rgba(0,0,0,0.85)' }}>
-
-        {/* ── Header ── */}
-        <div style={{ background:'#191919', borderBottom:'1px solid #252525', padding:'15px 18px',
-                      display:'flex', alignItems:'flex-start', justifyContent:'space-between', flexShrink:0, borderRadius:'16px 16px 0 0' }}>
-          <div>
-            <div style={{ display:'flex', alignItems:'center', gap:9, marginBottom:5 }}>
-              <span style={{ fontSize:21, fontWeight:800, fontFamily:'monospace', letterSpacing:'0.04em', color: gc }}>{droneId}</span>
-              {latest?.threat && (
-                <span style={{ fontSize:7.5, fontWeight:800, padding:'3px 9px', borderRadius:4,
-                               background:`${tc}1e`, color:tc, border:`1px solid ${tc}55`, letterSpacing:'0.1em' }}>
-                  {latest.threat} THREAT
-                </span>
-              )}
-            </div>
-            <div style={{ fontSize:10, color:'#555', fontFamily:'monospace' }}>{latest?.model ?? '—'}</div>
-          </div>
-          <button onClick={onClose} className="hover:text-white transition-colors"
-                  style={{ background:'none', border:'none', color:'#505050',
-                           fontSize:18, cursor:'pointer', lineHeight:1, padding:'2px 4px', marginTop:2 }}>✕</button>
-        </div>
-
-        {/* ── Body ── */}
-        <div style={{ padding:'14px 18px 10px', overflowY:'auto', display:'flex', flexDirection:'column', gap:8 }}>
-
-          {/* Identity */}
-          <Divider label="Identity" />
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:7 }}>
-            <F label="Detections"  value={n}              color="#ffffff" />
-            <F label="Group"       value={latest?.group}  color={gc} />
-            <F label="Subgroup"    value={latest?.subgroup} />
-            <F label="Registered"  value={registered == null ? '—' : registered ? '✓ Yes' : '✗ No'}
-               color={registered == null ? '#555' : registered ? '#34d399' : '#ef4444'} />
-          </div>
-
-          {/* Flight */}
-          <Divider label="Flight Data" />
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:7 }}>
-            <F label="Max Height"   value={`${maxHeight} m`} />
-            <F label="Avg Height"   value={`${avgHeight} m`} />
-            <F label="Max Speed"    value={`${maxSpeed} m/s`} />
-            <F label="Avg Speed"    value={`${avgSpeed} m/s`} />
-          </div>
-
-          {/* Signal */}
-          <Divider label="Signal" />
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:7 }}>
-            <F label="Avg RSSI"     value={`${avgRssi} dBm`} color="#a78bfa" />
-            <F label="Avg SNR"      value={`${avgSnr} dB`}   color="#a78bfa" />
-            <F label="Protocol"     value={protocols || '—'} />
-            <F label="Frequency"    value={uniqueFreqs ? `${uniqueFreqs} MHz` : '—'} />
-          </div>
-
-          {/* Detection */}
-          <Divider label="Detection" />
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:7 }}>
-            <F label="Direction"    value={topDir} />
-            <F label="Min Distance" value={minDist < 9999 ? `${minDist} m` : '—'} color="#f97316" />
-            <F label="Avg Distance" value={`${avgDist} m`} />
-            <F label="Has GPS"      value={hasGps == null ? '—' : hasGps ? '✓ Yes' : '✗ No'}
-               color={hasGps == null ? '#555' : hasGps ? '#34d399' : '#ef4444'} />
-          </div>
-
-          {/* Detectors */}
-          {detectorIds.length > 0 && <>
-            <Divider label="Detectors" />
-            <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
-              {detectorIds.map(id => {
-                const cnt = detections.filter(d => d.detector_id === id).length;
-                return (
-                  <div key={id} style={{ padding:'4px 10px', borderRadius:20, fontSize:10,
-                                         fontWeight:700, fontFamily:'monospace',
-                                         background:'rgba(59,130,246,0.10)', color:'#60a5fa',
-                                         border:'1px solid rgba(59,130,246,0.28)' }}>
-                    {id} <span style={{ opacity:0.6 }}>×{cnt}</span>
-                  </div>
-                );
-              })}
-            </div>
-          </>}
-
-          {/* Timestamps */}
-          <Divider label="Timeline" />
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:7 }}>
-            <F label="First Seen" value={firstSeen ? formatDate(firstSeen) : '—'} color="#888" />
-            <F label="Last Seen"  value={lastSeen  ? formatDate(lastSeen)  : '—'} color="#888" />
-          </div>
-
-          {/* Detection sessions timeline */}
-          <div style={{ marginTop:4 }}>
-            <DetectionTimeline detections={detections} />
-          </div>
-
-          {/* RSSI sparkline */}
-          {detections.length >= 2 && (
-            <div style={{ marginTop:2 }}>
-              <SignalSparkline detections={detections} width={360} height={40} />
-            </div>
-          )}
-
-          <div style={{ height:4 }} />
-        </div>
-
-        {/* ── Footer ── */}
-        <div style={{ padding:'0 18px 16px', flexShrink:0 }}>
-          <button onClick={onClose} className="hover:bg-[#2c2c2c] hover:text-white transition-colors"
-                  style={{ width:'100%', padding:'11px', borderRadius:8,
-                           background:'#1e1e1e', border:'1px solid #303030',
-                           color:'#999', fontSize:12, fontWeight:700,
-                           cursor:'pointer', letterSpacing:'0.05em', fontFamily:'monospace' }}>
-            Close
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ── Drone intel table ─────────────────────────────────────────────────────────
 function DroneIntelTable({ droneStats, onDroneClick }) {
   const [sort,    setSort]   = useState({ key: 'detections', dir: -1 });
@@ -406,40 +55,39 @@ function DroneIntelTable({ droneStats, onDroneClick }) {
   const slice = sorted.slice((page - 1) * PER, page * PER);
 
   const th = (key, label) => (
-    <th key={key} className="px-3 py-2.5 text-left text-xs font-bold text-[#777] uppercase tracking-wider cursor-pointer hover:text-[#ccc] whitespace-nowrap select-none"
-        onClick={() => { setSort(s => ({ key, dir: s.key === key ? -s.dir : -1 })); setPage(1); }}>
+    <th key={key} className="th-sortable" onClick={() => { setSort(s => ({ key, dir: s.key === key ? -s.dir : -1 })); setPage(1); }}>
       {label} {sort.key === key ? (sort.dir === -1 ? '↓' : '↑') : ''}
     </th>
   );
 
   return (
     <>
-      <div className="mb-3 flex items-center gap-2 flex-wrap">
-        <div className="relative flex-1 min-w-[160px]">
+      <div className="flex-row-center gap-2 flex-wrap" style={{ marginBottom: 12 }}>
+        <div className="relative flex-1" style={{ minWidth: 160 }}>
           <input type="text" placeholder="Search drone ID / model…" value={search}
             onChange={e => { setSearch(e.target.value); setPage(1); }}
-            className="w-full bg-[#141414] border border-[#3a3a3a] rounded-lg pl-8 pr-3 py-1.5 text-xs text-white outline-none focus:border-orange-500" />
-          <SearchIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-[#666]" />
+            className="search-input-styled" />
+          <SearchIcon className="absolute text-[#666]" style={{ left: '0.625rem', top: '50%', transform: 'translateY(-50%)', width: '0.75rem', height: '0.75rem' }} />
         </div>
         {[['groupF', setGroupF, groupF, [['ALL','All Groups'],['GA','GA'],['GB','GB']]],
           ['threatF', setThreatF, threatF, [['ALL','All Threats'],['HIGH','HIGH'],['MEDIUM','MEDIUM'],['LOW','LOW']]]
         ].map(([, setter, val, opts]) => (
           <select key={val} value={val} onChange={e => { setter(e.target.value); setPage(1); }}
-            className="bg-[#111] border border-[#2a2a2a] rounded-lg px-2 py-1.5 text-xs text-white outline-none">
+            className="select-styled" style={{ padding: '0.375rem 0.5rem' }}>
             {opts.map(([v,l]) => <option key={v} value={v}>{l}</option>)}
           </select>
         ))}
-        <span className="text-xs text-[#666] font-mono ml-auto">{sorted.length} drones</span>
+        <span className="font-mono" style={{ fontSize: 12, color: '#666', marginLeft: 'auto' }}>{sorted.length} drones</span>
       </div>
 
-      <div className="overflow-x-auto rounded-lg border border-[#222]">
-        <table className="w-full text-left border-collapse" style={{ minWidth: '720px' }}>
-          <thead className="bg-[#1a1a1a] border-b border-[#2a2a2a] sticky top-0 z-10">
+      <div className="table-wrapper rounded-lg" style={{ border: '1px solid #222' }}>
+        <table className="table-main" style={{ minWidth: '720px' }}>
+          <thead className="table-header" style={{ position: 'sticky', top: 0, zIndex: 10 }}>
             <tr>
               {th('drone_id','Drone ID')}{th('model','Model')}{th('group','Group')}{th('detections','Events')}
               {th('threat','Threat')}{th('maxHeight','Max H')}{th('maxSpeed','Max Spd')}{th('avgSpeed','Avg Spd')}
               {th('protocols','Protocol')}
-              <th className="px-3 py-2.5 text-xs font-bold text-[#777] uppercase">Dirs</th>
+              <th className="th-sortable" style={{ cursor: 'default' }}>Dirs</th>
               {th('firstSeen','First Seen')}{th('lastSeen','Last Seen')}
             </tr>
           </thead>
@@ -448,19 +96,19 @@ function DroneIntelTable({ droneStats, onDroneClick }) {
               const tc = THREAT_COLOR[d.threat] ?? '#888';
               const gc = d.group === 'GA' ? GA : GB;
               return (
-                <tr key={d.drone_id} className="border-b border-[#1a1a1a] hover:bg-[#1c1c1c] cursor-pointer transition-colors" onClick={() => onDroneClick(d.drone_id)}>
-                  <td className="px-3 py-2.5 text-xs font-mono font-bold" style={{ color: gc }}>{d.drone_id}</td>
-                  <td className="px-3 py-2.5 text-xs text-[#ddd] whitespace-nowrap">{d.model}</td>
-                  <td className="px-3 py-2.5"><span className="text-[10px] px-1.5 py-0.5 rounded-full font-bold" style={{ background:`${gc}22`, color:gc, border:`1px solid ${gc}44` }}>{d.group}</span></td>
-                  <td className="px-3 py-2.5 text-xs font-mono font-bold text-white">{d.detections}</td>
-                  <td className="px-3 py-2.5"><span className="text-[10px] px-1.5 py-0.5 rounded font-bold" style={{ background:`${tc}22`, color:tc }}>{d.threat}</span></td>
-                  <td className="px-3 py-2.5 text-xs font-mono text-[#aaa]">{d.maxHeight} m</td>
-                  <td className="px-3 py-2.5 text-xs font-mono text-[#aaa]">{d.maxSpeed} m/s</td>
-                  <td className="px-3 py-2.5 text-xs font-mono text-[#aaa]">{d.avgSpeed} m/s</td>
-                  <td className="px-3 py-2.5 text-xs text-[#888]">{d.protocols.join(', ') || '—'}</td>
-                  <td className="px-3 py-2.5 text-xs font-mono text-[#888]">{d.directions.join(' ') || '—'}</td>
-                  <td className="px-3 py-2.5 text-xs font-mono text-[#777] whitespace-nowrap">{formatDate(d.firstSeen)}</td>
-                  <td className="px-3 py-2.5 text-xs font-mono text-[#777] whitespace-nowrap">{formatDate(d.lastSeen)}</td>
+                <tr key={d.drone_id} className="table-body-row" style={{ cursor: 'pointer' }} onClick={() => onDroneClick(d.drone_id)}>
+                  <td className="table-cell font-mono" style={{ fontWeight: 'bold', color: gc }}>{d.drone_id}</td>
+                  <td className="table-cell" style={{ color: '#ddd', whiteSpace: 'nowrap' }}>{d.model}</td>
+                  <td className="table-cell"><span className="rounded-full font-bold" style={{ fontSize: '10px', padding: '2px 6px', background:`${gc}22`, color:gc, border:`1px solid ${gc}44` }}>{d.group}</span></td>
+                  <td className="table-cell font-mono" style={{ fontWeight: 'bold', color: '#fff' }}>{d.detections}</td>
+                  <td className="table-cell"><span className="rounded font-bold" style={{ fontSize: '10px', padding: '2px 6px', background:`${tc}22`, color:tc }}>{d.threat}</span></td>
+                  <td className="table-cell font-mono" style={{ color: '#aaa' }}>{d.maxHeight} m</td>
+                  <td className="table-cell font-mono" style={{ color: '#aaa' }}>{d.maxSpeed} m/s</td>
+                  <td className="table-cell font-mono" style={{ color: '#aaa' }}>{d.avgSpeed} m/s</td>
+                  <td className="table-cell" style={{ color: '#888' }}>{d.protocols.join(', ') || '—'}</td>
+                  <td className="table-cell font-mono" style={{ color: '#888' }}>{d.directions.join(' ') || '—'}</td>
+                  <td className="table-cell font-mono" style={{ color: '#777', whiteSpace: 'nowrap' }}>{formatDate(d.firstSeen)}</td>
+                  <td className="table-cell font-mono" style={{ color: '#777', whiteSpace: 'nowrap' }}>{formatDate(d.lastSeen)}</td>
                 </tr>
               );
             })}
@@ -469,10 +117,10 @@ function DroneIntelTable({ droneStats, onDroneClick }) {
       </div>
 
       {totalPages > 1 && (
-        <div className="flex items-center justify-between mt-2">
-          <button disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="text-[10px] px-3 py-1 rounded border border-[#333] text-[#888] hover:text-white disabled:opacity-30 disabled:cursor-not-allowed">← Prev</button>
-          <span className="text-[9px] text-[#555] font-mono">Page {page} / {totalPages}</span>
-          <button disabled={page >= totalPages} onClick={() => setPage(p => p + 1)} className="text-[10px] px-3 py-1 rounded border border-[#333] text-[#888] hover:text-white disabled:opacity-30 disabled:cursor-not-allowed">Next →</button>
+        <div className="flex-row-between" style={{ marginTop: 8 }}>
+          <button disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="pagination-btn">← Prev</button>
+          <span className="font-mono" style={{ fontSize: 9, color: '#555' }}>Page {page} / {totalPages}</span>
+          <button disabled={page >= totalPages} onClick={() => setPage(p => p + 1)} className="pagination-btn">Next →</button>
         </div>
       )}
     </>
@@ -495,63 +143,57 @@ export default function EventLog({ events, droneStats, isLoading, currentPage, s
         <DroneHistoryPanel droneId={selectedDroneId} allEvents={events} onClose={() => setSelectedDroneId(null)} />
       )}
 
-      <div className="flex-1 flex flex-col overflow-hidden bg-[#0a0a0a]">
+      <div className="flex-1 flex-col-start overflow-hidden bg-dark-0a">
         {/* Date range search bar */}
-        <div className="flex-none border-b border-[#2a2a2a] bg-[#111] px-4 py-2.5 flex items-center gap-3 flex-wrap">
-          <span className="text-xs text-[#666] uppercase tracking-wider font-semibold whitespace-nowrap">Date Range</span>
-          <div className="flex items-center gap-2 flex-wrap flex-1">
-            <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
-              className="bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg px-2.5 py-1 text-xs text-white outline-none focus:border-orange-500 transition-colors" />
-            <span className="text-xs text-[#555]">—</span>
-            <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)}
-              className="bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg px-2.5 py-1 text-xs text-white outline-none focus:border-orange-500 transition-colors" />
-            <button onClick={handleSearch} disabled={isLoading}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all disabled:opacity-40 hover:border-[#555] hover:text-white"
-              style={{ background: '#1a1a1a', border: '1px solid #3a3a3a', color: '#ccc' }}>
+        <div className="date-range-bar">
+          <span style={{ fontSize: 12, color: '#666', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 'semibold', whiteSpace: 'nowrap' }}>Date Range</span>
+          <div className="flex-row-center gap-2 flex-wrap flex-1">
+            <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="date-input-styled" />
+            <span style={{ fontSize: 12, color: '#555' }}>—</span>
+            <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="date-input-styled" />
+            <button onClick={handleSearch} disabled={isLoading} className="btn btn-ghost flex-row-center gap-1-5" style={{ padding: '0.25rem 0.625rem', fontSize: '12px' }}>
               {isLoading
-                ? <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />Searching…</>
-                : <><SearchIcon className="w-3 h-3 text-orange-400" />Search</>}
+                ? <><div className="spinner-small-white animate-spin" />Searching…</>
+                : <><SearchIcon style={{ width: '0.75rem', height: '0.75rem', color: '#ea580c' }} />Search</>}
             </button>
           </div>
         </div>
         <Toolbar>
-          <div className="flex items-center gap-2">
-            <TableIcon className="w-4 h-4 text-orange-500" />
-            <span className="text-sm font-bold text-white">Drone Intelligence</span>
-            <span className="text-[9px] px-2 py-0.5 rounded font-bold" style={{ background:'#1e1e1e', color:GA, border:'1px solid rgba(249,115,22,0.3)' }}>
+          <div className="flex-row-center gap-2">
+            <TableIcon style={{ width: '1rem', height: '1rem', color: '#f97316' }} />
+            <span style={{ fontSize: '14px', fontWeight: 'bold', color: '#fff' }}>Drone Intelligence</span>
+            <span className="rounded font-bold" style={{ fontSize: '9px', padding: '2px 8px', background:'#1e1e1e', color:GA, border:'1px solid rgba(249,115,22,0.3)' }}>
               {droneStats.length} drones
             </span>
           </div>
-          <span className="text-[10px] text-[#444] ml-1">Click a row to see 7-day history</span>
-          <button onClick={() => exportCSV(droneStats)} disabled={!droneStats.length}
-            className="ml-auto flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded transition-all disabled:opacity-30 hover:border-[#555] hover:text-white"
-            style={{ background:'#141414', border:'1px solid #2a2a2a', color:'#888' }}>
-            <DownloadIcon className="w-3 h-3" />
+          <span style={{ fontSize: 10, color: '#444', marginLeft: 4 }}>Click a row to see 7-day history</span>
+          <button onClick={() => exportCSV(droneStats)} disabled={!droneStats.length} className="btn btn-ghost flex-row-center gap-1" style={{ marginLeft: 'auto', fontSize: 10, padding: '2px 8px' }}>
+            <DownloadIcon style={{ width: '0.75rem', height: '0.75rem' }} />
             Export CSV
           </button>
         </Toolbar>
 
-        <div className="flex-1 overflow-auto p-4">
+        <div className="flex-1 overflow-y-auto" style={{ padding: '1rem' }}>
           {isLoading
             ? (
-              <div className="flex flex-col gap-3 animate-pulse">
-                <div className="flex gap-2 mb-2">
-                  {Array.from({length:4}).map((_,i) => <div key={i} className="h-8 rounded-lg flex-1" style={{ background: '#141414', border: '1px solid #2a2a2a' }} />)}
+              <div className="flex-col-start gap-3 animate-pulse">
+                <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                  {Array.from({length:4}).map((_,i) => <div key={i} className="rounded-lg flex-1" style={{ height: 32, background: '#141414', border: '1px solid #2a2a2a' }} />)}
                 </div>
                 <div className="rounded-lg overflow-hidden border border-[#222]">
                   <div className="grid px-3 py-2.5 gap-3" style={{ gridTemplateColumns:'2fr 1.5fr 0.8fr 0.8fr 1fr 1fr 1fr 1fr 1fr', background:'#1a1a1a', borderBottom:'1px solid #2a2a2a' }}>
-                    {Array.from({length:9}).map((_,i) => <div key={i} className="h-2 rounded" style={{ background:'#2a2a2a' }} />)}
+                    {Array.from({length:9}).map((_,i) => <div key={i} className="rounded" style={{ height: 8, background:'#2a2a2a' }} />)}
                   </div>
                   {Array.from({length:8}).map((_,i) => (
                     <div key={i} className="grid px-3 py-3 gap-3 border-b border-[#161616]" style={{ gridTemplateColumns:'2fr 1.5fr 0.8fr 0.8fr 1fr 1fr 1fr 1fr 1fr', background: i%2===0?'#0d0d0d':'#0a0a0a' }}>
-                      {Array.from({length:9}).map((_,j) => <div key={j} className="h-3 rounded" style={{ background: '#1a1a1a', width:`${50+(j*19)%40}%` }} />)}
+                      {Array.from({length:9}).map((_,j) => <div key={j} className="rounded" style={{ background: '#1a1a1a', height: 12, width:`${50+(j*19)%40}%` }} />)}
                     </div>
                   ))}
                 </div>
               </div>
             )
             : droneStats.length === 0
-            ? <div className="p-10 text-center text-[#555] text-sm">No drone data found</div>
+            ? <div className="text-center text-sm" style={{ padding: '2.5rem 0', color: '#555' }}>No drone data found</div>
             : <DroneIntelTable droneStats={droneStats} onDroneClick={setSelectedDroneId} />}
         </div>
       </div>
