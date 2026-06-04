@@ -113,11 +113,6 @@ export default function App() {
   } = useEvents(isMockMode);
   const defaultDates = getDefaultDates(isMockMode);
 
-  useEffect(() => {
-    const { startDate, endDate } = getDefaultDates(isMockMode);
-    search({ startDate, endDate, group: 'ALL', subgroup: 'ALL', detector: 'ALL' });
-  }, [isMockMode, search]);
-
   const handleSearch = useCallback((params) => {
     const det = params.detector ?? 'ALL';
     const sg  = params.subgroup ?? 'ALL';

@@ -1,5 +1,7 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import mockData from '../data/Mockdata';
+import { toDateStr } from '../shared/helpers';
 import {
   buildDailyMap, buildHourlyMap, buildDirectionMap,
   buildFreqBands, buildDroneStats, buildDistribution,
@@ -13,40 +15,26 @@ const EMPTY_SUMMARY = {
   max_speed: '—', high_threat: 0,
 };
 
-export function useEvents(isMockMode) {
-  const [events,          setEvents]          = useState([]);
-  const [summary,         setSummary]         = useState(EMPTY_SUMMARY);
-  const [daily,           setDaily]           = useState({});
-  const [hourly,          setHourly]          = useState([]);
-  const [directions,      setDirections]      = useState([]);
-  const [freqBands,       setFreqBands]       = useState([]);
-  const [droneStats,      setDroneStats]      = useState([]);
-  const [modelCount,      setModelCount]      = useState([]);  
-  const [protocolSummary, setProtocolSummary] = useState([]);  
-  const [isLoading,       setIsLoading]       = useState(false);
-  const [currentPage,     setCurrentPage]     = useState(1);
+// Helper function to fetch data
+const fetchEvents = async (isMock, params) => {
+  if (!params) return null;
+  const { startDate, endDate, group, subgroup, detector } = params;
 
-  const isMockRef = useRef(isMockMode);
-  useEffect(() => { isMockRef.current = isMockMode; }, [isMockMode]);
+  // ── MOCK mode ────────────────────────────────────────────────────────────
+  if (isMock) {
+    await new Promise(res => setTimeout(res, 200));
+    const filtered = mockData.filter(e => {
+      const d = e.datetime.slice(0, 10);
+      if (d < startDate || d > endDate)                                  return false;
+      if (group    && group    !== 'ALL' && e.group       !== group)     return false;
+      if (subgroup && subgroup !== 'ALL' && e.subgroup    !== subgroup)  return false;
+      if (detector && detector !== 'ALL' && e.detector_id !== detector)  return false;
+      return true;
+    });
 
-  const search = useCallback(async ({ startDate, endDate, group, subgroup, detector }) => {
-    setIsLoading(true);
-    setCurrentPage(1);
-
-    // ── MOCK mode ────────────────────────────────────────────────────────────
-    if (isMockRef.current) {
-      await new Promise(res => setTimeout(res, 350));
-      const filtered = mockData.filter(e => {
-        const d = e.datetime.slice(0, 10);
-        if (d < startDate || d > endDate)                                  return false;
-        if (group    && group    !== 'ALL' && e.group       !== group)     return false;
-        if (subgroup && subgroup !== 'ALL' && e.subgroup    !== subgroup)  return false;
-        if (detector && detector !== 'ALL' && e.detector_id !== detector)  return false;
-        return true;
-      });
-
-      setEvents(filtered);
-      setSummary({
+    return {
+      events: filtered,
+      summary: {
         total:         filtered.length,
         ga:            filtered.filter(e => e.group === 'GA').length,
         gb:            filtered.filter(e => e.group === 'GB').length,
@@ -56,145 +44,150 @@ export function useEvents(isMockMode) {
         avg_height:    filtered.length ? Math.round(filtered.reduce((s, e) => s + e.height, 0) / filtered.length)   : '—',
         max_speed:     filtered.length ? Math.max(...filtered.map(e => e.speed)).toFixed(1)                         : '—',
         high_threat:   filtered.filter(e => e.threat === 'HIGH').length,
-      });
-      setDaily(buildDailyMap(filtered));
-      setHourly(buildHourlyMap(filtered));
-      setDirections(buildDirectionMap(filtered));
-      setFreqBands(buildFreqBands(filtered));
-      setDroneStats(buildDroneStats(filtered));
-      setModelCount(buildDistribution(filtered, 'model'));
-      setProtocolSummary(buildDistribution(filtered, 'protocol_name'));
+      },
+      daily: buildDailyMap(filtered),
+      hourly: buildHourlyMap(filtered),
+      directions: buildDirectionMap(filtered),
+      freqBands: buildFreqBands(filtered),
+      droneStats: buildDroneStats(filtered),
+      modelCount: buildDistribution(filtered, 'model'),
+      protocolSummary: buildDistribution(filtered, 'protocol_name'),
+    };
+  }
 
-      setIsLoading(false);
-      return;
+  // ── LIVE mode ─────────────────────────────────────────────────────────────
+  const filters = {};
+  if (group    && group    !== 'ALL') filters.group    = group;
+  if (subgroup && subgroup !== 'ALL') filters.subgroup = subgroup;
+  if (detector && detector !== 'ALL') filters.detectors = [detector];
+
+  const body = {
+    filters,
+    time_range: { start: startDate, end: endDate },
+    metrics: [
+      'kpi_summary',
+      'model_count',
+      'frequency_distribution',
+      'daily_detection',
+      'hourly_detection',
+      'direction_summary',
+      'protocol_summary',
+      'drone_stats',
+      'raw_events',
+    ],
+  };
+
+  const res = await fetch(API_URL, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const json = await res.json();
+  const d = json.data ?? {};
+
+  const dailyObj = {};
+  (d.daily_detection ?? []).forEach(item => {
+    dailyObj[item.date] = { GA: item.GA ?? 0, GB: item.GB ?? 0 };
+  });
+
+  const hourlyFull = Array.from({ length: 24 }, (_, h) => ({ hour: h, GA: 0, GB: 0 }));
+  (d.hourly_detection ?? []).forEach(item => {
+    if (item.hour >= 0 && item.hour < 24) {
+      hourlyFull[item.hour] = { hour: item.hour, GA: item.GA ?? 0, GB: item.GB ?? 0 };
     }
+  });
 
-    // ── LIVE mode ─────────────────────────────────────────────────────────────
-    try {
-      // 1. สร้าง Request Body ──────────────────────────────────
-      const filters = {};
-      if (group    && group    !== 'ALL') filters.group    = group;
-      if (subgroup && subgroup !== 'ALL') filters.subgroup = subgroup;
-      if (detector && detector !== 'ALL') filters.detectors = [detector];
+  const k = d.kpi_summary ?? {};
 
-      const body = {
-        filters,
-        time_range: { start: startDate, end: endDate },
-        metrics: [
-          'kpi_summary',
-          'model_count',
-          'frequency_distribution',
-          'daily_detection',
-          'hourly_detection',
-          'direction_summary',
-          'protocol_summary',
-          'drone_stats',
-          'raw_events',
-        ],
-      };
+  return {
+    events: d.raw_events ?? [],
+    summary: {
+      total:         k.total      ?? 0,
+      ga:            k.ga         ?? 0,
+      gb:            k.gb         ?? 0,
+      unique_drones: k.unique     ?? 0,
+      detectors:     0,
+      avg_speed:     k.avgSpeed   ?? '—',
+      avg_height:    k.avgHeight  ?? '—',
+      max_speed:     k.maxSpeed   ?? '—',
+      high_threat:   k.highThreat ?? 0,
+    },
+    daily: dailyObj,
+    hourly: hourlyFull,
+    directions: d.direction_summary ?? [],
+    freqBands: (d.frequency_distribution ?? []).map(f => ({
+      band:  f.range.replace(' MHz', '').replace('-', '–'),
+      count: f.count,
+    })),
+    modelCount: (d.model_count ?? []).map(m => [m.device_type, m.count]),
+    protocolSummary: (d.protocol_summary ?? []).map(p => [p.name, p.count]),
+    droneStats: (d.drone_stats ?? []).map(ds => ({
+      drone_id:   ds.drone_id,
+      model:      ds.model,
+      group:      ds.group,
+      detections: ds.detections,
+      threat:     ds.threat,
+      maxHeight:  ds.max_height,
+      maxSpeed:   ds.max_speed,
+      avgSpeed:   ds.avg_speed,
+      protocols:  ds.protocols  ?? [],
+      freqs:      ds.freqs      ?? [],
+      directions: ds.directions ?? [],
+      firstSeen:  ds.first_seen,
+      lastSeen:   ds.last_seen,
+    })),
+  };
+};
 
-      const res = await fetch(API_URL, {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify(body),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json = await res.json();
+export function useEvents(isMockMode) {
+  const [searchParams, setSearchParams] = useState(() => ({
+    startDate: isMockMode ? '2026-04-01' : toDateStr(new Date(Date.now() - 7 * 86400000)),
+    endDate: isMockMode ? '2026-04-10' : toDateStr(new Date()),
+    group: 'ALL',
+    subgroup: 'ALL',
+    detector: 'ALL',
+  }));
 
-      const d = json.data ?? {};
+  const [currentPage, setCurrentPage] = useState(1);
 
-      // 2. Raw events ───────────────────────────────────────────────────────
-      setEvents(d.raw_events ?? []);
+  // Reset searchParams when isMockMode changes
+  useEffect(() => {
+    setSearchParams({
+      startDate: isMockMode ? '2026-04-01' : toDateStr(new Date(Date.now() - 7 * 86400000)),
+      endDate: isMockMode ? '2026-04-10' : toDateStr(new Date()),
+      group: 'ALL',
+      subgroup: 'ALL',
+      detector: 'ALL',
+    });
+    setCurrentPage(1);
+  }, [isMockMode]);
 
-      // 3. kpi_summary ───────────
-      const k = d.kpi_summary ?? {};
-      setSummary({
-        total:         k.total      ?? 0,
-        ga:            k.ga         ?? 0,
-        gb:            k.gb         ?? 0,
-        unique_drones: k.unique     ?? 0,    // unique → unique_drones
-        detectors:     0,
-        avg_speed:     k.avgSpeed   ?? '—',  // avgSpeed → avg_speed
-        avg_height:    k.avgHeight  ?? '—',  // avgHeight → avg_height
-        max_speed:     k.maxSpeed   ?? '—',  // maxSpeed → max_speed
-        high_threat:   k.highThreat ?? 0,    // highThreat → high_threat
-      });
+  const { data, isLoading } = useQuery({
+    queryKey: ['events', isMockMode, searchParams],
+    queryFn: () => fetchEvents(isMockMode, searchParams),
+    enabled: !!searchParams,
+    staleTime: 1000 * 60 * 5, // Cache 5 min
+  });
 
-      // 4. daily_detection ─────────────────
-      const dailyObj = {};
-      (d.daily_detection ?? []).forEach(item => {
-        dailyObj[item.date] = { GA: item.GA ?? 0, GB: item.GB ?? 0 };
-      });
-      setDaily(dailyObj);
-
-      // 5. hourly_detection: sparse → เติมครบ 24 ชั่วโมง ─────────────────────
-      const hourlyFull = Array.from({ length: 24 }, (_, h) => ({ hour: h, GA: 0, GB: 0 }));
-      (d.hourly_detection ?? []).forEach(item => {
-        if (item.hour >= 0 && item.hour < 24) {
-          hourlyFull[item.hour] = { hour: item.hour, GA: item.GA ?? 0, GB: item.GB ?? 0 };
-        }
-      });
-      setHourly(hourlyFull);
-
-      // 6. direction_summary────────────────────────
-      setDirections(d.direction_summary ?? []);
-
-      // 7. frequency_distribution ──
-      setFreqBands(
-        (d.frequency_distribution ?? []).map(f => ({
-          band:  f.range.replace(' MHz', '').replace('-', '–'),
-          count: f.count,
-        }))
-      );
-
-      // 8. model_count ────────
-      setModelCount(
-        (d.model_count ?? []).map(m => [m.device_type, m.count])
-      );
-
-      // 9. protocol_summary ───────────
-      setProtocolSummary(
-        (d.protocol_summary ?? []).map(p => [p.name, p.count])
-      );
-
-      // 10. droneStats
-      setDroneStats(
-        (d.drone_stats ?? []).map(ds => ({
-          drone_id:   ds.drone_id,
-          model:      ds.model,
-          group:      ds.group,
-          detections: ds.detections,
-          threat:     ds.threat,
-          maxHeight:  ds.max_height,
-          maxSpeed:   ds.max_speed,
-          avgSpeed:   ds.avg_speed,
-          protocols:  ds.protocols  ?? [],
-          freqs:      ds.freqs      ?? [],
-          directions: ds.directions ?? [],
-          firstSeen:  ds.first_seen,
-          lastSeen:   ds.last_seen,
-        }))
-      );
-
-    } catch (err) {
-      console.error('API Error:', err);
-      setEvents([]);
-      setSummary(EMPTY_SUMMARY);
-      setDaily({});
-      setHourly([]);
-      setDirections([]);
-      setFreqBands([]);
-      setDroneStats([]);
-      setModelCount([]);
-      setProtocolSummary([]);
-    } finally {
-      setIsLoading(false);
-    }
+  const search = useCallback((params) => {
+    setSearchParams(params);
+    setCurrentPage(1);
   }, []);
 
   return {
-    events, summary, daily, hourly, directions,
-    freqBands, droneStats, modelCount, protocolSummary,
-    isLoading, search, currentPage, setCurrentPage,
+    events:          data?.events ?? [],
+    summary:         data?.summary ?? EMPTY_SUMMARY,
+    daily:           data?.daily ?? {},
+    hourly:          data?.hourly ?? [],
+    directions:      data?.directions ?? [],
+    freqBands:       data?.freqBands ?? [],
+    droneStats:      data?.droneStats ?? [],
+    modelCount:      data?.modelCount ?? [],
+    protocolSummary: data?.protocolSummary ?? [],
+    isLoading,
+    search,
+    currentPage,
+    setCurrentPage,
   };
 }
