@@ -18,7 +18,7 @@ const EMPTY_SUMMARY = {
 // Helper function to fetch data
 const fetchEvents = async (isMock, params) => {
   if (!params) return null;
-  const { startDate, endDate, group, subgroup, detector } = params;
+  const { startDate, endDate, group, subgroup, detector, metrics } = params;
 
   // ── MOCK mode ────────────────────────────────────────────────────────────
   if (isMock) {
@@ -64,7 +64,7 @@ const fetchEvents = async (isMock, params) => {
   const body = {
     filters,
     time_range: { start: startDate, end: endDate },
-    metrics: [
+    metrics: metrics || [
       'kpi_summary',
       'model_count',
       'frequency_distribution',
@@ -86,23 +86,21 @@ const fetchEvents = async (isMock, params) => {
   const json = await res.json();
   const d = json.data ?? {};
 
-  const dailyObj = {};
-  (d.daily_detection ?? []).forEach(item => {
-    dailyObj[item.date] = { GA: item.GA ?? 0, GB: item.GB ?? 0 };
-  });
-
-  const hourlyFull = Array.from({ length: 24 }, (_, h) => ({ hour: h, GA: 0, GB: 0 }));
-  (d.hourly_detection ?? []).forEach(item => {
-    if (item.hour >= 0 && item.hour < 24) {
-      hourlyFull[item.hour] = { hour: item.hour, GA: item.GA ?? 0, GB: item.GB ?? 0 };
-    }
-  });
-
-  const k = d.kpi_summary ?? {};
-
-  return {
+  const result = {
     events: d.raw_events ?? [],
-    summary: {
+    summary: EMPTY_SUMMARY,
+    daily: {},
+    hourly: [],
+    directions: [],
+    freqBands: [],
+    modelCount: [],
+    protocolSummary: [],
+    droneStats: [],
+  };
+
+  if (d.kpi_summary) {
+    const k = d.kpi_summary;
+    result.summary = {
       total:         k.total      ?? 0,
       ga:            k.ga         ?? 0,
       gb:            k.gb         ?? 0,
@@ -112,17 +110,48 @@ const fetchEvents = async (isMock, params) => {
       avg_height:    k.avgHeight  ?? '—',
       max_speed:     k.maxSpeed   ?? '—',
       high_threat:   k.highThreat ?? 0,
-    },
-    daily: dailyObj,
-    hourly: hourlyFull,
-    directions: d.direction_summary ?? [],
-    freqBands: (d.frequency_distribution ?? []).map(f => ({
+    };
+  }
+
+  if (d.daily_detection) {
+    const dailyObj = {};
+    d.daily_detection.forEach(item => {
+      dailyObj[item.date] = { GA: item.GA ?? 0, GB: item.GB ?? 0 };
+    });
+    result.daily = dailyObj;
+  }
+
+  if (d.hourly_detection) {
+    const hourlyFull = Array.from({ length: 24 }, (_, h) => ({ hour: h, GA: 0, GB: 0 }));
+    d.hourly_detection.forEach(item => {
+      if (item.hour >= 0 && item.hour < 24) {
+        hourlyFull[item.hour] = { hour: item.hour, GA: item.GA ?? 0, GB: item.GB ?? 0 };
+      }
+    });
+    result.hourly = hourlyFull;
+  }
+
+  if (d.direction_summary) {
+    result.directions = d.direction_summary;
+  }
+
+  if (d.frequency_distribution) {
+    result.freqBands = d.frequency_distribution.map(f => ({
       band:  f.range.replace(' MHz', '').replace('-', '–'),
       count: f.count,
-    })),
-    modelCount: (d.model_count ?? []).map(m => [m.device_type, m.count]),
-    protocolSummary: (d.protocol_summary ?? []).map(p => [p.name, p.count]),
-    droneStats: (d.drone_stats ?? []).map(ds => ({
+    }));
+  }
+
+  if (d.model_count) {
+    result.modelCount = d.model_count.map(m => [m.device_type, m.count]);
+  }
+
+  if (d.protocol_summary) {
+    result.protocolSummary = d.protocol_summary.map(p => [p.name, p.count]);
+  }
+
+  if (d.drone_stats) {
+    result.droneStats = d.drone_stats.map(ds => ({
       drone_id:   ds.drone_id,
       model:      ds.model,
       group:      ds.group,
@@ -136,8 +165,10 @@ const fetchEvents = async (isMock, params) => {
       directions: ds.directions ?? [],
       firstSeen:  ds.first_seen,
       lastSeen:   ds.last_seen,
-    })),
-  };
+    }));
+  }
+
+  return result;
 };
 
 export function useEvents(isMockMode) {
@@ -163,11 +194,29 @@ export function useEvents(isMockMode) {
     setCurrentPage(1);
   }, [isMockMode]);
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['events', isMockMode, searchParams],
-    queryFn: () => fetchEvents(isMockMode, searchParams),
+  // 1. Telemetry Query (Live updates every 3s in LIVE mode)
+  const { data: telemetryData, isLoading: isTelemetryLoading } = useQuery({
+    queryKey: ['events', 'telemetry', isMockMode, searchParams],
+    queryFn: () => fetchEvents(isMockMode, { ...searchParams, metrics: ['raw_events'] }),
     enabled: !!searchParams,
-    staleTime: 1000 * 60 * 5, // Cache 5 min
+    staleTime: 1000 * 2,
+    refetchInterval: isMockMode ? false : 3000,
+  });
+
+  // 2. Analytics Query (Slow updates every 60s in LIVE mode)
+  const { data: analyticsData, isLoading: isAnalyticsLoading } = useQuery({
+    queryKey: ['events', 'analytics', isMockMode, searchParams],
+    queryFn: () => fetchEvents(isMockMode, {
+      ...searchParams,
+      metrics: [
+        'kpi_summary', 'model_count', 'frequency_distribution',
+        'daily_detection', 'hourly_detection', 'direction_summary',
+        'protocol_summary', 'drone_stats'
+      ]
+    }),
+    enabled: !!searchParams,
+    staleTime: 1000 * 60 * 2,
+    refetchInterval: isMockMode ? false : 60000,
   });
 
   const search = useCallback((params) => {
@@ -176,16 +225,16 @@ export function useEvents(isMockMode) {
   }, []);
 
   return {
-    events:          data?.events ?? [],
-    summary:         data?.summary ?? EMPTY_SUMMARY,
-    daily:           data?.daily ?? {},
-    hourly:          data?.hourly ?? [],
-    directions:      data?.directions ?? [],
-    freqBands:       data?.freqBands ?? [],
-    droneStats:      data?.droneStats ?? [],
-    modelCount:      data?.modelCount ?? [],
-    protocolSummary: data?.protocolSummary ?? [],
-    isLoading,
+    events:          telemetryData?.events ?? [],
+    summary:         analyticsData?.summary ?? EMPTY_SUMMARY,
+    daily:           analyticsData?.daily ?? {},
+    hourly:          analyticsData?.hourly ?? [],
+    directions:      analyticsData?.directions ?? [],
+    freqBands:       analyticsData?.freqBands ?? [],
+    droneStats:      analyticsData?.droneStats ?? [],
+    modelCount:      analyticsData?.modelCount ?? [],
+    protocolSummary: analyticsData?.protocolSummary ?? [],
+    isLoading:       isTelemetryLoading || isAnalyticsLoading,
     search,
     currentPage,
     setCurrentPage,
