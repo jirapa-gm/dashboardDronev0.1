@@ -63,5 +63,3 @@ useEvents.js
 โฟลเดอร์: Backend/
  main.py         
  - ทำหน้าที่เปิดจุดรับส่งข้อมูล API ยิงผ่านพอร์ต 8000 (http://localhost:8000/api/events)
-
-

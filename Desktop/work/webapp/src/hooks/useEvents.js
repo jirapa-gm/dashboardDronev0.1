@@ -171,7 +171,7 @@ const fetchEvents = async (isMock, params) => {
   return result;
 };
 
-export function useEvents(isMockMode) {
+export function useEvents(isMockMode, activeTab) {
   const [searchParams, setSearchParams] = useState(() => ({
     startDate: isMockMode ? '2026-04-01' : toDateStr(new Date(Date.now() - 7 * 86400000)),
     endDate: isMockMode ? '2026-04-10' : toDateStr(new Date()),
@@ -194,13 +194,13 @@ export function useEvents(isMockMode) {
     setCurrentPage(1);
   }, [isMockMode]);
 
-  // 1. Telemetry Query (Live updates every 3s in LIVE mode)
+  // 1. Telemetry Query (Live updates every 3s in LIVE mode, only when viewing Map tab)
   const { data: telemetryData, isLoading: isTelemetryLoading } = useQuery({
     queryKey: ['events', 'telemetry', isMockMode, searchParams],
     queryFn: () => fetchEvents(isMockMode, { ...searchParams, metrics: ['raw_events'] }),
     enabled: !!searchParams,
     staleTime: 1000 * 2,
-    refetchInterval: isMockMode ? false : 3000,
+    refetchInterval: (activeTab === 'tactical' && !isMockMode) ? 3000 : false,
   });
 
   // 2. Analytics Query (Slow updates every 60s in LIVE mode)

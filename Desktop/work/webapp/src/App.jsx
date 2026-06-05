@@ -110,7 +110,7 @@ export default function App() {
     events, summary, daily, hourly, directions, freqBands, droneStats,
     modelCount, protocolSummary,
     isLoading, currentPage, setCurrentPage, search
-  } = useEvents(isMockMode);
+  } = useEvents(isMockMode, activeTab);
   const defaultDates = getDefaultDates(isMockMode);
 
   const handleSearch = useCallback((params) => {
