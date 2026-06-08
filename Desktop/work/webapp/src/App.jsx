@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Navbar             from './components/Navbar';
 import Sidebar            from './components/Sidebar';
-import { DetectorSummary, GroupSummary, SubgroupSummary } from './components/Sidebar';
+import { DetectorSummary, GroupSummary, SubgroupSummary } from './components/Summaries';
 import AnalyticsDashboard from './components/AnalyticsDashboard';
 import TacticalMapView    from './components/TacticalMapView';
 import EventLog           from './components/EventLog';

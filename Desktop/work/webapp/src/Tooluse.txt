@@ -13,7 +13,9 @@ index.css
  Navbar.jsx            
  - แถบเมนูด้านบน แสดงโลโก้ สถานะเครื่อง และปุ่มสลับ Live/Mock Mode
  Sidebar.jsx           
- - แถบตัวกรองการสืบค้นข้อมูลด้านซ้าย รวมถึงหน้าสรุปสถิติย่อยรายระดับ(GroupSummary, SubgroupSummary, DetectorSummary)
+ - แถบตัวกรองการสืบค้นข้อมูลด้านซ้าย (Scope Tree และฟิลเตอร์ค้นหา)
+ Summaries.jsx
+ - รวมคอมโพเนนต์สรุปยอดสถิติรายระดับสำหรับการวิเคราะห์ (GroupSummary, SubgroupSummary, DetectorSummary)
  AnalyticsDashboard.jsx 
  - แท็บหลักการวิเคราะห์ (Analytics) แสดง KPIs สรุปผลรายชั่วโมงและรุ่นโดรนที่พบบ่อยที่สุด
 TacticalMapView.jsx    
