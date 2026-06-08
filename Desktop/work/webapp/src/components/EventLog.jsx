@@ -22,9 +22,9 @@ function exportCSV(droneStats) {
     d.maxHeight,
     d.maxSpeed,
     d.avgSpeed,
-    `"${d.protocols.join('; ')}"`,
-    `"${d.freqs.join('; ')}"`,
-    `"${d.directions.join(' ')}"`,
+    `"${d.protocols?.join('; ') ?? ''}"`,
+    `"${d.freqs?.join('; ') ?? ''}"`,
+    `"${d.directions?.join(' ') ?? ''}"`,
     d.firstSeen,
     d.lastSeen,
   ].join(','));
@@ -45,7 +45,7 @@ function DroneIntelTable({ droneStats, onDroneClick }) {
 
   const sorted = useMemo(() => {
     let arr = droneStats;
-    if (search)            arr = arr.filter(d => (d.drone_id || '').toLowerCase().includes(search.toLowerCase()) || (d.model || '').toLowerCase().includes(search.toLowerCase()));
+    if (search)            arr = arr.filter(d => d.drone_id?.toLowerCase().includes(search.toLowerCase()) || d.model?.toLowerCase().includes(search.toLowerCase()));
     if (groupF  !== 'ALL') arr = arr.filter(d => d.group  === groupF);
     if (threatF !== 'ALL') arr = arr.filter(d => d.threat === threatF);
     return [...arr].sort((a, b) => sort.dir * (String(a[sort.key]) < String(b[sort.key]) ? -1 : 1));
@@ -105,8 +105,8 @@ function DroneIntelTable({ droneStats, onDroneClick }) {
                   <td className="table-cell font-mono" style={{ color: '#aaa' }}>{d.maxHeight} m</td>
                   <td className="table-cell font-mono" style={{ color: '#aaa' }}>{d.maxSpeed} m/s</td>
                   <td className="table-cell font-mono" style={{ color: '#aaa' }}>{d.avgSpeed} m/s</td>
-                  <td className="table-cell" style={{ color: '#888' }}>{d.protocols.join(', ') || '—'}</td>
-                  <td className="table-cell font-mono" style={{ color: '#888' }}>{d.directions.join(' ') || '—'}</td>
+                  <td className="table-cell" style={{ color: '#888' }}>{d.protocols?.join(', ') || '—'}</td>
+                  <td className="table-cell font-mono" style={{ color: '#888' }}>{d.directions?.join(' ') || '—'}</td>
                   <td className="table-cell font-mono" style={{ color: '#777', whiteSpace: 'nowrap' }}>{formatDate(d.firstSeen)}</td>
                   <td className="table-cell font-mono" style={{ color: '#777', whiteSpace: 'nowrap' }}>{formatDate(d.lastSeen)}</td>
                 </tr>
