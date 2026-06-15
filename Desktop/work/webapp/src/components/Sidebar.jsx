@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Collapsible, SectionHeader, Field } from '../shared/ui';
 import { FilterIcon, LayersIcon, SearchIcon, CalendarIcon } from '../shared/icons';
 import { GROUP_COLOR } from '../shared/constants';
@@ -124,14 +124,20 @@ function DetectorTree({ selectedGroup, selectedSubgroup, selectedDetector, onCha
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
-export default function Sidebar({ events, isLoading, onSearch, defaultStartDate, defaultEndDate, visible }) {
+export default function Sidebar({ events, isLoading, onSearch, defaultStartDate, defaultEndDate, visible, activeGroup, activeSubgroup, activeDetector }) {
   const [startDate,     setStartDate]   = useState(defaultStartDate);
   const [endDate,       setEndDate]     = useState(defaultEndDate);
-  const [selectedGroup, setSelectedGroup] = useState('ALL');
-  const [selectedSG,    setSelectedSG]  = useState('ALL');
-  const [selectedDet,   setSelectedDet] = useState('ALL');
+  const [selectedGroup, setSelectedGroup] = useState(activeGroup || 'ALL');
+  const [selectedSG,    setSelectedSG]  = useState(activeSubgroup || 'ALL');
+  const [selectedDet,   setSelectedDet] = useState(activeDetector || 'ALL');
   const [filtersOpen,   setFiltersOpen] = useState(true);
   const [treeOpen,      setTreeOpen]    = useState(true);
+
+  useEffect(() => {
+    setSelectedGroup(activeGroup || 'ALL');
+    setSelectedSG(activeSubgroup || 'ALL');
+    setSelectedDet(activeDetector || 'ALL');
+  }, [activeGroup, activeSubgroup, activeDetector]);
 
   const startDateInputRef = useRef(null);
   const endDateInputRef = useRef(null);

@@ -4,7 +4,7 @@ import {
    buildDirectionMap, buildKPIs, buildFreqBands,
 } from '../utils/chartUtils';
 import { GA, GB, DIR_LABELS, PROTO_COLORS, MODEL_COLORS } from '../shared/constants';
-import { Card, Spinner, EmptyState, GroupTabs, HBar, Toolbar } from '../shared/ui';
+import { Card, Spinner, EmptyState, HBar, Toolbar } from '../shared/ui';
 import { BarChartIcon, ClockIcon, CompassIcon, DroneIcon, SignalIcon, LogIcon, AlertIcon, SunIcon, MoonIcon } from '../shared/icons';
 import { RadarChart, GroupBarChart, CombinedHourlyChart } from './Charts';
 import { buildPdfHtml } from '../utils/pdfTemplate';
@@ -388,13 +388,12 @@ export default function AnalyticsDashboard({
   protocolSummary: precomputedProtocolSummary,
   isLoading, isMockMode,
 }) {
-  const [groupFilter,   setGroupFilter]   = useState('ALL');
   const [pdfLoading,    setPdfLoading]    = useState(false);
   const [showPdfModal,  setShowPdfModal]  = useState(false);
   const contentRef = useRef(null);
 
-  const filtered   = groupFilter === 'ALL' ? events : events.filter(e => e.group === groupFilter);
-  const isFiltered = groupFilter !== 'ALL';
+  const filtered   = events;
+  const isFiltered = false;
 
   const kpis = useMemo(() => {
     if (!isFiltered && summary?.total > 0) {
@@ -505,7 +504,7 @@ export default function AnalyticsDashboard({
         <PdfExportModal
           onClose={() => setShowPdfModal(false)}
           onExport={handleExportPdf}
-          groupFilter={groupFilter}
+          groupFilter="ALL"
           isLoading={pdfLoading}
         />
       )}
@@ -520,7 +519,6 @@ export default function AnalyticsDashboard({
           </span>
         </div>
         <div className="flex-row-center gap-2" style={{ marginLeft: 'auto' }}>
-          <GroupTabs value={groupFilter} onChange={setGroupFilter} />
           <button
             onClick={() => setShowPdfModal(true)}
             disabled={pdfLoading}
@@ -534,7 +532,7 @@ export default function AnalyticsDashboard({
       </Toolbar>
 
       <div ref={contentRef} className="flex-col-start gap-4" style={{ padding: '1rem' }}>
-        <KpiStrip kpis={kpis} events={filtered} groupFilter={groupFilter} />
+        <KpiStrip kpis={kpis} events={filtered} groupFilter="ALL" />
 
         <Card title="Hourly Distribution" icon={<ClockIcon />}>
           <HourlyChart events={filtered} precomputedHourly={hourly} isFiltered={isFiltered} />
@@ -542,10 +540,10 @@ export default function AnalyticsDashboard({
 
         <div className="grid-cards-3">
           <Card title="Direction of Origin" icon={<CompassIcon />}>
-            <RadarChart dirData={dirData} groupFilter={groupFilter} />
+            <RadarChart dirData={dirData} groupFilter="ALL" />
             <div className="flex-row-center gap-4" style={{ marginTop: 8, justifyContent: 'center' }}>
-              {groupFilter !== 'GB' && <div className="flex-row-center gap-1-5"><div className="rounded" style={{ background: GA, width: 8, height: 8 }} /><span style={{ fontSize: 9, color: '#888' }}>GA</span></div>}
-              {groupFilter !== 'GA' && <div className="flex-row-center gap-1-5"><div className="rounded" style={{ background: GB, width: 8, height: 8 }} /><span style={{ fontSize: 9, color: '#888' }}>GB</span></div>}
+              <div className="flex-row-center gap-1-5"><div className="rounded" style={{ background: GA, width: 8, height: 8 }} /><span style={{ fontSize: 9, color: '#888' }}>GA</span></div>
+              <div className="flex-row-center gap-1-5"><div className="rounded" style={{ background: GB, width: 8, height: 8 }} /><span style={{ fontSize: 9, color: '#888' }}>GB</span></div>
             </div>
             <div className="grid-cols-4 gap-1" style={{ marginTop: '0.75rem' }}>
               {[...dirData].sort((a,b)=>b.total-a.total).slice(0,4).map(({ dir, total }) => (

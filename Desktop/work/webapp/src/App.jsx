@@ -75,25 +75,30 @@ export default function App() {
 
       <main className="main-content">
 
-        {/* Sidebar — always present on Analytics tab */}
+        {/* Sidebar — always present */}
         <Sidebar events={events} isLoading={isLoading} onSearch={handleSearch}
                  defaultStartDate={defaultDates.startDate} defaultEndDate={defaultDates.endDate}
-                 visible={sidebarVisible && activeTab === 'analytics'} activeDetector={activeDetector} />
+                 visible={sidebarVisible} activeDetector={activeDetector}
+                 activeGroup={activeGroup} activeSubgroup={activeSubgroup} />
 
-        {isMobile && sidebarVisible && activeTab === 'analytics' && (
+        {isMobile && sidebarVisible && (
           <div className="backdrop-overlay" onClick={() => setSidebarVisible(false)} />
         )}
 
         <div className="content-pane">
 
-          {/* ── Analytics tab ── sidebar stays, breadcrumb lives inside content */}
-          {activeTab === 'analytics' && <>
-            {showSummary && (
+          {/* Breadcrumb is now global to show active filters on all tabs */}
+          {showSummary && activeTab !== 'log' && (
+            <div className="shrink-0">
               <Breadcrumb
                 activeGroup={activeGroup} activeSubgroup={activeSubgroup} activeDetector={activeDetector}
                 onReset={resetAll} onResetToGroup={resetToGroup}
               />
-            )}
+            </div>
+          )}
+
+          {/* ── Analytics tab ── */}
+          {activeTab === 'analytics' && <>
             {showGroup    && <GroupSummary    groupId={activeGroup} events={events} />}
             {showSubgroup && <SubgroupSummary groupId={activeGroup} subgroupId={activeSubgroup} events={events} />}
             {showDetector && <DetectorSummary detectorId={activeDetector} events={events} />}
@@ -119,14 +124,12 @@ export default function App() {
             <EventLog
               events={events} droneStats={droneStats} isLoading={isLoading}
               currentPage={currentPage} setCurrentPage={setCurrentPage}
-              onSearch={handleSearch}
-              defaultStartDate={defaultDates.startDate} defaultEndDate={defaultDates.endDate}
             />
           )}
         </div>
       </main>
 
-      {isMobile && !sidebarVisible && activeTab === 'analytics' && <SwipeHint />}
+      {isMobile && !sidebarVisible && <SwipeHint />}
     </div>
   );
 }

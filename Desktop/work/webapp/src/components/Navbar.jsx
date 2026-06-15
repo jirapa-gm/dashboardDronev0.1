@@ -1,16 +1,13 @@
 import { SidebarOpenIcon, SidebarClosedIcon, DroneIcon } from '../shared/icons';
 
 export default function Navbar({ isMockMode, setIsMockMode, sidebarVisible, setSidebarVisible, activeTab }) {
-  const showSidebarToggle = activeTab === 'analytics';
   return (
     <nav className="nav-bar">
       <div className="flex-row-center gap-3">
-        {showSidebarToggle && (
-          <button onClick={() => setSidebarVisible(!sidebarVisible)} className="btn-icon"
-                  aria-label={sidebarVisible ? 'Collapse sidebar' : 'Expand sidebar'}>
-            {sidebarVisible ? <SidebarOpenIcon /> : <SidebarClosedIcon />}
-          </button>
-        )}
+        <button onClick={() => setSidebarVisible(!sidebarVisible)} className="btn-icon"
+                aria-label={sidebarVisible ? 'Collapse sidebar' : 'Expand sidebar'}>
+          {sidebarVisible ? <SidebarOpenIcon /> : <SidebarClosedIcon />}
+        </button>
 
         <div className="nav-brand">
           <div className="nav-logo-box">

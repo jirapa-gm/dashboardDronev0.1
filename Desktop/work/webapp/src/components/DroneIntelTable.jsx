@@ -7,14 +7,12 @@ export default function DroneIntelTable({ droneStats, onDroneClick }) {
   const [sort,    setSort]   = useState({ key: 'detections', dir: -1 });
   const [search,  setSearch] = useState('');
   const [page,    setPage]   = useState(1);
-  const [groupF,  setGroupF] = useState('ALL');
   const [threatF, setThreatF]= useState('ALL');
   const PER = 12;
 
   const sorted = useMemo(() => {
     let arr = droneStats;
     if (search)            arr = arr.filter(d => d.drone_id?.toLowerCase().includes(search.toLowerCase()) || d.model?.toLowerCase().includes(search.toLowerCase()));
-    if (groupF  !== 'ALL') arr = arr.filter(d => d.group  === groupF);
     if (threatF !== 'ALL') arr = arr.filter(d => d.threat === threatF);
     return [...arr].sort((a, b) => {
       const valA = a[sort.key];
@@ -24,7 +22,7 @@ export default function DroneIntelTable({ droneStats, onDroneClick }) {
       }
       return sort.dir * String(valA).localeCompare(String(valB));
     });
-  }, [droneStats, sort, search, groupF, threatF]);
+  }, [droneStats, sort, search, threatF]);
 
   const totalPages = Math.max(1, Math.ceil(sorted.length / PER));
   const slice = sorted.slice((page - 1) * PER, page * PER);
@@ -44,7 +42,7 @@ export default function DroneIntelTable({ droneStats, onDroneClick }) {
             className="search-input-styled" />
           <SearchIcon className="absolute text-[#666]" style={{ left: '0.625rem', top: '50%', transform: 'translateY(-50%)', width: '0.75rem', height: '0.75rem' }} />
         </div>
-        {[['groupF', setGroupF, groupF, [['ALL','All Groups'],['GA','GA'],['GB','GB']]],
+        {[
           ['threatF', setThreatF, threatF, [['ALL','All Threats'],['HIGH','HIGH'],['MEDIUM','MEDIUM'],['LOW','LOW']]]
         ].map(([, setter, val, opts]) => (
           <select key={val} value={val} onChange={e => { setter(e.target.value); setPage(1); }}

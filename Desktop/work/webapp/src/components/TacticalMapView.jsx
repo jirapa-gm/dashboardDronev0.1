@@ -472,7 +472,6 @@ const MAP_CSS = `
 
 // ── Main component ─────────────────────────────────────────────────────────────
 export default function TacticalMapView({ events, isLoading, simContext }) {
-  const [filterGroup, setFilterGroup] = useState('ALL');
   const [showSweep,   setShowSweep]   = useState(true);
   const [radarMode,   setRadarMode]   = useState('none');
 
@@ -485,7 +484,7 @@ export default function TacticalMapView({ events, isLoading, simContext }) {
   const simTrailRefs  = useRef({}); // For live simulation trails
   const simLineRefs   = useRef({}); // For live simulation detection lines
 
-  const filtered   = filterGroup === 'ALL' ? events : events.filter(e => e.group === filterGroup);
+  const filtered   = events;
   const detectors  = useMemo(() => {
     if (simContext?.simMode && simContext?.detectors) {
       return simContext.detectors.map(d => ({ ...d, events: filtered.filter(e => e.detector_id === d.id) }));
@@ -584,7 +583,9 @@ export default function TacticalMapView({ events, isLoading, simContext }) {
       const color = GROUP_COLORS[det.group] ?? '#f97316';
       const mk = L.marker([det.lat, det.lon], { icon: makeDetectorIcon(color), zIndexOffset: 500 })
         .bindTooltip(
-          `<b style="font-family:monospace;color:${color}">${det.id}</b>${det.name ? `<br/><span style="font-size:10px;color:#aaa">${det.name}</span>` : ''}<br/><span style="font-size:10px;color:#888">${det.events.length} detections</span>`,
+          '<b style="font-family:monospace;color:' + color + '">' + det.id + '</b>' + 
+          (det.name ? '<br/><span style="font-size:10px;color:#aaa">' + det.name + '</span>' : '') + 
+          '<br/><span style="font-size:10px;color:#888">' + (det.events ? det.events.length : 0) + ' detections</span>',
           { direction: 'top', className: 'tac-tt' }
         )
         .addTo(map);
@@ -620,7 +621,7 @@ export default function TacticalMapView({ events, isLoading, simContext }) {
     } else if (!simContext?.simMode) {
       map.setView([radarBound.lat, radarBound.lon], 12);
     }
-  }, [leafletMap.current, filtered.length, filterGroup, events, showSweep, radarMode, detectors.length, simContext?.simMode]);
+  }, [leafletMap.current, filtered.length, events, showSweep, radarMode, detectors.length, simContext?.simMode]);
 
   // ── Fast Subscription for Live Simulation Rendering ──
   useEffect(() => {
@@ -632,14 +633,14 @@ export default function TacticalMapView({ events, isLoading, simContext }) {
     const makeSimIcon = (color, heading) => {
       const rot = Math.round(heading ?? 0);
       return L.divIcon({
-        html: `<div style="transform:rotate(${rot}deg);line-height:0">
-          <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28">
-            <circle cx="14" cy="14" r="12" fill="${color}" opacity="0.18"/>
-            <polygon points="14,2 18,22 14,18 10,22" fill="${color}" stroke="#111" stroke-width="1.2" stroke-linejoin="round"/>
-            <circle cx="14" cy="14" r="3" fill="${color}" opacity="0.9" stroke="#111" stroke-width="1"/>
-            <circle cx="14" cy="14" r="1.5" fill="#fff" opacity="0.85"/>
-          </svg>
-        </div>`,
+        html: '<div style="transform:rotate(' + rot + 'deg);line-height:0">' +
+          '<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28">' +
+            '<circle cx="14" cy="14" r="12" fill="' + color + '" opacity="0.18"/>' +
+            '<polygon points="14,2 18,22 14,18 10,22" fill="' + color + '" stroke="#111" stroke-width="1.2" stroke-linejoin="round"/>' +
+            '<circle cx="14" cy="14" r="3" fill="' + color + '" opacity="0.9" stroke="#111" stroke-width="1"/>' +
+            '<circle cx="14" cy="14" r="1.5" fill="#fff" opacity="0.85"/>' +
+          '</svg>' +
+        '</div>',
         iconSize: [28, 28], iconAnchor: [14, 14], className: ''
       });
     };
@@ -693,7 +694,7 @@ export default function TacticalMapView({ events, isLoading, simContext }) {
         }
 
         detectingRadars.forEach(r => {
-          const lineId = `${drone.id}-${r.id}`;
+          const lineId = drone.id + '-' + r.id;
           activeLines.add(lineId);
           if (!simLineRefs.current[lineId]) {
             simLineRefs.current[lineId] = L.polyline([[r.lat, r.lon], [pos.lat, pos.lon]], {
@@ -706,32 +707,36 @@ export default function TacticalMapView({ events, isLoading, simContext }) {
 
         // Update popup content dynamically if open
         if (simDroneRefs.current[drone.id].isPopupOpen()) {
-          const popupHtml = `
-            <div style="font-family:system-ui,sans-serif;font-size:11px;line-height:1.5;color:#ccc;padding:4px;min-width:180px">
-              <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(255,255,255,0.06);padding-bottom:6px;margin-bottom:6px">
-                <div style="font-weight:800;color:${drone.color};font-size:13px;font-family:monospace">${drone.id}</div>
-                <div style="font-size:9px;color:#888">${drone.group}</div>
-              </div>
-              <div style="display:flex;justify-content:space-between">
-                <span style="color:#888">Model:</span> <b style="color:#fff">${drone.model}</b>
-              </div>
-              <div style="display:flex;justify-content:space-between">
-                <span style="color:#888">Telemetry:</span> <b style="color:#fff">${drone.speed} m/s @ ${drone.height}m</b>
-              </div>
-              <div style="display:flex;justify-content:space-between">
-                <span style="color:#888">Protocol:</span> <b style="color:#34d399">${drone.protocol}</b>
-              </div>
-              <div style="margin-top:8px;padding-top:6px;border-top:1px dashed rgba(255,255,255,0.1)">
-                <div style="font-size:9px;color:#888;text-transform:uppercase;margin-bottom:4px;letter-spacing:0.05em;font-weight:bold">Tracking Radars (${detectingRadars.length})</div>
-                ${detectingRadars.length > 0 
-                  ? detectingRadars.map(r => `
-                      <div style="display:flex;justify-content:space-between;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.2);padding:2px 6px;border-radius:4px;margin-bottom:3px">
-                        <span style="color:#f87171;font-weight:bold;font-family:monospace">${r.id}</span>
-                        <span style="color:#fff;font-family:monospace">${r.dist} m</span>
-                      </div>`).join('') 
-                  : `<div style="color:#555;font-style:italic">Out of range (No Signal)</div>`}
-              </div>
-            </div>`;
+          const radarsHtml = detectingRadars.length > 0 
+            ? detectingRadars.map(r => 
+                '<div style="display:flex;justify-content:space-between;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.2);padding:2px 6px;border-radius:4px;margin-bottom:3px">' +
+                  '<span style="color:#f87171;font-weight:bold;font-family:monospace">' + r.id + '</span>' +
+                  '<span style="color:#fff;font-family:monospace">' + r.dist + ' m</span>' +
+                '</div>'
+              ).join('')
+            : '<div style="color:#555;font-style:italic">Out of range (No Signal)</div>';
+
+          const popupHtml = 
+            '<div style="font-family:system-ui,sans-serif;font-size:11px;line-height:1.5;color:#ccc;padding:4px;min-width:180px">' +
+              '<div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(255,255,255,0.06);padding-bottom:6px;margin-bottom:6px">' +
+                '<div style="font-weight:800;color:' + drone.color + ';font-size:13px;font-family:monospace">' + drone.id + '</div>' +
+                '<div style="font-size:9px;color:#888">' + drone.group + '</div>' +
+              '</div>' +
+              '<div style="display:flex;justify-content:space-between">' +
+                '<span style="color:#888">Model:</span> <b style="color:#fff">' + drone.model + '</b>' +
+              '</div>' +
+              '<div style="display:flex;justify-content:space-between">' +
+                '<span style="color:#888">Telemetry:</span> <b style="color:#fff">' + drone.speed + ' m/s @ ' + drone.height + 'm</b>' +
+              '</div>' +
+              '<div style="display:flex;justify-content:space-between">' +
+                '<span style="color:#888">Protocol:</span> <b style="color:#34d399">' + drone.protocol + '</b>' +
+              '</div>' +
+              '<div style="margin-top:8px;padding-top:6px;border-top:1px dashed rgba(255,255,255,0.1)">' +
+                '<div style="font-size:9px;color:#888;text-transform:uppercase;margin-bottom:4px;letter-spacing:0.05em;font-weight:bold">Tracking Radars (' + detectingRadars.length + ')</div>' +
+                radarsHtml +
+              '</div>' +
+            '</div>';
+
           simDroneRefs.current[drone.id].setPopupContent(popupHtml);
         }
       });
@@ -782,7 +787,7 @@ export default function TacticalMapView({ events, isLoading, simContext }) {
           {radarMode !== 'global' && (
             <button onClick={() => setShowSweep(v => !v)}
               className="rounded-full font-bold transition-all"
-              style={{ fontSize: '10px', padding: '6px 12px', background: showSweep ? '#22c55e18' : '#1a1a1a', border: `1px solid ${showSweep ? '#22c55e' : '#2a2a2a'}`, color: showSweep ? '#22c55e' : '#555', cursor: 'pointer' }}>
+              style={{ fontSize: '10px', padding: '6px 12px', background: showSweep ? '#22c55e18' : '#1a1a1a', border: '1px solid ' + (showSweep ? '#22c55e' : '#2a2a2a'), color: showSweep ? '#22c55e' : '#555', cursor: 'pointer' }}>
               Sweep
             </button>
           )}
@@ -794,7 +799,7 @@ export default function TacticalMapView({ events, isLoading, simContext }) {
             style={{
               fontSize: '10px', padding: '6px 12px',
               background: radarMode === 'global' ? 'rgba(59,130,246,0.18)' : '#1a1a1a',
-              border: `1px solid ${radarMode === 'global' ? '#3b82f6' : '#2a2a2a'}`,
+              border: '1px solid ' + (radarMode === 'global' ? '#3b82f6' : '#2a2a2a'),
               color: radarMode === 'global' ? '#3b82f6' : '#555',
               cursor: 'pointer'
             }}>
@@ -804,21 +809,10 @@ export default function TacticalMapView({ events, isLoading, simContext }) {
 
         <div className="flex-row-center gap-1-5 ml-auto flex-wrap">
           {!simContext?.simMode && (
-            <button onClick={() => simContext.setShowConfig(true)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-orange-500/30 bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 text-[11px] font-bold tracking-wide transition-all uppercase">
-              <GamepadIcon className="w-4 h-4" /> Simulate
+            <button onClick={() => simContext.setShowConfig(true)} className="flex items-center justify-center p-2 rounded-lg border border-orange-500/30 bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 transition-all" title="Simulate">
+              <PlayIcon className="w-4 h-4" fill="currentColor" />
             </button>
           )}
-          {['ALL', 'GA', 'GB'].map(g => {
-            const active = filterGroup === g, color = g === 'GA' ? GA : g === 'GB' ? GB : '#64748b';
-            const count = g === 'ALL' ? events.length : events.filter(e => e.group === g).length;
-            return (
-              <button key={g} onClick={() => setFilterGroup(g)}
-                className="rounded-full font-bold transition-all"
-                style={{ fontSize: '11px', padding: '6px 14px', background: active ? `${color}18` : '#1a1a1a', border: `1px solid ${active ? color : '#2a2a2a'}`, color: active ? color : '#555', boxShadow: active ? `0 0 10px ${color}25` : 'none', cursor: 'pointer' }}>
-                {g === 'ALL' ? `All (${count})` : `${g} (${count})`}
-              </button>
-            );
-          })}
         </div>
       </Toolbar>
 
