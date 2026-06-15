@@ -37,136 +37,189 @@ export default function DroneHistoryPanel({ droneId, allEvents, onClose }) {
   const hasGps      = latest?.has_gps;
   const registered  = latest?.registered;
 
+  // ── SVGs for field icons ──────────────────────────────────────────────────
+  const icons = {
+    detections: `<svg style="width:11px;height:11px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>`,
+    group: `<svg style="width:11px;height:11px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>`,
+    subgroup: `<svg style="width:11px;height:11px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>`,
+    reg: `<svg style="width:11px;height:11px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>`,
+    height: `<svg style="width:11px;height:11px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>`,
+    speed: `<svg style="width:11px;height:11px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`,
+    rssi: `<svg style="width:11px;height:11px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h.01"/><path d="M8.5 16.5a5 5 0 0 1 7 0"/><path d="M5 13a10 10 0 0 1 14 0"/><path d="M1.5 9.5a15 15 0 0 1 21 0"/></svg>`,
+    snr: `<svg style="width:11px;height:11px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>`,
+    proto: `<svg style="width:11px;height:11px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`,
+    freq: `<svg style="width:11px;height:11px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M10.3 16.1a6 6 0 0 1 3.4 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>`,
+    dir: `<svg style="width:11px;height:11px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>`,
+    dist: `<svg style="width:11px;height:11px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>`,
+    gps: `<svg style="width:11px;height:11px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>`,
+    clock: `<svg style="width:11px;height:11px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
+    drone: `<svg style="width:15px;height:15px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a1 1 0 0 1 .894.553l3 6A1 1 0 0 1 15 10h-1v2h4a1 1 0 0 1 0 2h-4v2h1a1 1 0 0 1 .894 1.447l-3 6a1 1 0 0 1-1.788 0l-3-6A1 1 0 0 1 9 16h1v-2H6a1 1 0 0 1 0-2h4v-2H9a1 1 0 0 1-.894-1.447l3-6A1 1 0 0 1 12 2z"/></svg>`
+  };
+
   // ── field component ─────────────────────────────────────────────────────────
-  const F = ({ label, value, color, span }) => (
-    <div style={{
-      background:'#1a1a1a', border:'1px solid #262626', borderRadius:8,
-      padding:'9px 13px', gridColumn: span ? 'span 2' : undefined,
-    }}>
-      <div style={{ fontSize:9, color:'#555', textTransform:'uppercase', letterSpacing:'0.12em', marginBottom:5, fontFamily:'monospace' }}>{label}</div>
-      <div style={{ fontSize:14, fontWeight:700, fontFamily:'monospace', color: color ?? '#c8c8c8', lineHeight:1.2 }}>{value ?? '—'}</div>
-    </div>
-  );
+  const F = ({ label, value, color, icon, span }) => {
+    const themeStyles = color ? {
+      '--theme-color': color,
+      '--theme-glow': `${color}26`, // ~15% opacity in hex
+      '--theme-bg': `${color}0f`,   // ~6% opacity in hex
+      '--theme-border': `${color}33`, // ~20% opacity
+      '--theme-bg-hover': `${color}22`, // ~13% opacity
+      '--theme-border-hover': `${color}55`, // ~33% opacity
+    } : {};
+
+    return (
+      <div className="drone-stat-card" style={{
+        gridColumn: span ? 'span 2' : undefined,
+        ...themeStyles
+      }}>
+        {icon && (
+          <div className="drone-stat-icon-wrapper" dangerouslySetInnerHTML={{ __html: icon }} />
+        )}
+        <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
+          <div className="drone-stat-label">{label}</div>
+          <div className="drone-stat-value" style={{
+            fontFamily: typeof value === 'number' || (typeof value === 'string' && /\d/.test(value)) ? 'monospace' : 'system-ui, -apple-system, sans-serif',
+            color: color ?? '#eee',
+          }}>{value}</div>
+        </div>
+      </div>
+    );
+  };
 
   const Divider = ({ label }) => (
-    <div style={{ display:'flex', alignItems:'center', gap:8, margin:'4px 0' }}>
-      <div style={{ flex:1, height:1, background:'#2a2a2a' }} />
-      <span style={{ fontSize:9, color:'#666', textTransform:'uppercase', letterSpacing:'0.14em', fontFamily:'monospace', fontWeight:700 }}>{label}</span>
-      <div style={{ flex:1, height:1, background:'#2a2a2a' }} />
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '8px 0 4px 0' }}>
+      <span style={{ fontSize: 8.5, color: '#f97316', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 800, fontFamily: 'system-ui, -apple-system, sans-serif' }}>{label}</span>
+      <div style={{ flex: 1, height: 1, background: 'linear-gradient(to right, rgba(249, 115, 22, 0.12), transparent)' }} />
     </div>
   );
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div onClick={e => e.stopPropagation()}
-           style={{ background:'#131313', border:'1px solid #252525', borderRadius:16,
-                    width:420, maxWidth:'93vw', maxHeight:'92vh',
-                    display:'flex', flexDirection:'column',
-                    boxShadow:'0 40px 100px rgba(0,0,0,0.85)' }}>
+      <div onClick={e => e.stopPropagation()} className="drone-modal-content" style={{ maxWidth: '95vw' }}>
 
         {/* ── Header ── */}
-        <div style={{ background:'#191919', borderBottom:'1px solid #252525', padding:'15px 18px',
-                      display:'flex', alignItems:'flex-start', justifyContent:'space-between', flexShrink:0, borderRadius:'16px 16px 0 0' }}>
-          <div>
-            <div style={{ display:'flex', alignItems:'center', gap:9, marginBottom:5 }}>
-              <span style={{ fontSize:21, fontWeight:800, fontFamily:'monospace', letterSpacing:'0.04em', color: gc }}>{droneId}</span>
-              {latest?.threat && (
-                <span style={{ fontSize:7.5, fontWeight:800, padding:'3px 9px', borderRadius:4,
-                               background:`${tc}1e`, color:tc, border:`1px solid ${tc}55`, letterSpacing:'0.1em' }}>
-                  {latest.threat} THREAT
-                </span>
-              )}
+        <div style={{ background:'rgba(25, 25, 25, 0.6)', borderBottom:'1px solid rgba(255, 255, 255, 0.06)', padding:'10px 16px',
+                      display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0, borderRadius:'16px 16px 0 0' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', color: gc }}>
+              <div dangerouslySetInnerHTML={{ __html: icons.drone }} />
             </div>
-            <div style={{ fontSize:10, color:'#555', fontFamily:'monospace' }}>{latest?.model ?? '—'}</div>
+            <div>
+              <div style={{ display:'flex', alignItems:'center', gap:9, marginBottom:3 }}>
+                <span style={{ fontSize:18, fontWeight:800, fontFamily:'monospace', letterSpacing:'0.02em', color: '#fff' }}>{droneId}</span>
+                {latest?.threat && (
+                  <span style={{ fontSize:7.5, fontWeight:800, padding:'2px 8px', borderRadius:4,
+                                 background:`${tc}1e`, color:tc, border:`1px solid ${tc}40`, letterSpacing:'0.05em' }}>
+                    {latest.threat} THREAT
+                  </span>
+                )}
+              </div>
+              <div style={{ fontSize:10, color:'#777', fontFamily:'system-ui, -apple-system, sans-serif' }}>{latest?.model ?? 'Unknown Model'}</div>
+            </div>
           </div>
-          <button onClick={onClose} className="modal-close-btn">✕</button>
+          <button onClick={onClose} className="modal-close-btn">
+            <svg style={{ width: 10, height: 10 }} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
         </div>
 
         {/* ── Body ── */}
-        <div style={{ padding:'14px 18px 10px', overflowY:'auto', display:'flex', flexDirection:'column', gap:8 }}>
+        <div className="no-scrollbar" style={{ padding:'8px 16px 8px', overflowY:'auto', flex:1 }}>
+          <div className="drone-modal-grid">
+            
+            {/* Left Column: Drone Profile Stats & Info */}
+            <div className="flex-col-start gap-2">
+              {/* Identity */}
+              <Divider label="Identity" />
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:7 }}>
+                <F label="Detections"  value={n}              color="#ffffff" icon={icons.detections} />
+                <F label="Group"       value={latest?.group}  color={gc}      icon={icons.group} />
+                <F label="Subgroup"    value={latest?.subgroup}                icon={icons.subgroup} />
+                <F label="Registered"  value={registered ? 'Registered' : 'Unregistered'}
+                   color={registered ? '#34d399' : '#ef4444'}
+                   icon={icons.reg} />
+              </div>
 
-          {/* Identity */}
-          <Divider label="Identity" />
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:7 }}>
-            <F label="Detections"  value={n}              color="#ffffff" />
-            <F label="Group"       value={latest?.group}  color={gc} />
-            <F label="Subgroup"    value={latest?.subgroup} />
-            <F label="Registered"  value={registered == null ? '—' : registered ? '✓ Yes' : '✗ No'}
-               color={registered == null ? '#555' : registered ? '#34d399' : '#ef4444'} />
-          </div>
+              {/* Flight */}
+              <Divider label="Flight Data" />
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:7 }}>
+                <F label="Max Height"   value={`${maxHeight} m`}  icon={icons.height} />
+                <F label="Avg Height"   value={`${avgHeight} m`}  icon={icons.height} />
+                <F label="Max Speed"    value={`${maxSpeed} m/s`} icon={icons.speed} />
+                <F label="Avg Speed"    value={`${avgSpeed} m/s`} icon={icons.speed} />
+              </div>
 
-          {/* Flight */}
-          <Divider label="Flight Data" />
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:7 }}>
-            <F label="Max Height"   value={`${maxHeight} m`} />
-            <F label="Avg Height"   value={`${avgHeight} m`} />
-            <F label="Max Speed"    value={`${maxSpeed} m/s`} />
-            <F label="Avg Speed"    value={`${avgSpeed} m/s`} />
-          </div>
+              {/* Signal */}
+              <Divider label="Signal & Protocol" />
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:7 }}>
+                <F label="Avg RSSI"     value={`${avgRssi} dBm`} color="#a78bfa" icon={icons.rssi} />
+                <F label="Avg SNR"      value={`${avgSnr} dB`}   color="#c084fc" icon={icons.snr} />
+                <F label="Protocol"     value={protocols || '—'}                 icon={icons.proto} />
+                <F label="Frequency"    value={uniqueFreqs ? `${uniqueFreqs} MHz` : '—'} icon={icons.freq} />
+              </div>
 
-          {/* Signal */}
-          <Divider label="Signal" />
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:7 }}>
-            <F label="Avg RSSI"     value={`${avgRssi} dBm`} color="#a78bfa" />
-            <F label="Avg SNR"      value={`${avgSnr} dB`}   color="#a78bfa" />
-            <F label="Protocol"     value={protocols || '—'} />
-            <F label="Frequency"    value={uniqueFreqs ? `${uniqueFreqs} MHz` : '—'} />
-          </div>
+              {/* Location & Direction */}
+              <Divider label="Location & Direction" />
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:7 }}>
+                <F label="Direction"    value={topDir}                            icon={icons.dir} />
+                <F label="Min Distance" value={minDist < 9999 ? `${minDist} m` : '—'} color="#f97316" icon={icons.dist} />
+                <F label="Avg Distance" value={`${avgDist} m`}                    icon={icons.dist} />
+                <F label="GPS State"    value={hasGps ? 'GPS Active' : 'No GPS'}
+                   color={hasGps ? '#34d399' : '#ef4444'}
+                   icon={icons.gps} />
+              </div>
+            </div>
 
-          {/* Detection */}
-          <Divider label="Detection" />
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:7 }}>
-            <F label="Direction"    value={topDir} />
-            <F label="Min Distance" value={minDist < 9999 ? `${minDist} m` : '—'} color="#f97316" />
-            <F label="Avg Distance" value={`${avgDist} m`} />
-            <F label="Has GPS"      value={hasGps == null ? '—' : hasGps ? '✓ Yes' : '✗ No'}
-               color={hasGps == null ? '#555' : hasGps ? '#34d399' : '#ef4444'} />
-          </div>
-
-          {/* Detectors */}
-          {detectorIds.length > 0 && <>
-            <Divider label="Detectors" />
-            <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
-              {detectorIds.map(id => {
-                const cnt = detections.filter(d => d.detector_id === id).length;
-                return (
-                  <div key={id} style={{ padding:'4px 10px', borderRadius:20, fontSize:10,
-                                         fontWeight:700, fontFamily:'monospace',
-                                         background:'rgba(59,130,246,0.10)', color:'#60a5fa',
-                                         border:'1px solid rgba(59,130,246,0.28)' }}>
-                    {id} <span style={{ opacity:0.6 }}>×{cnt}</span>
+            {/* Right Column: Timelines, Charts & Detectors */}
+            <div className="flex-col-start gap-2">
+              {/* Detectors */}
+              {detectorIds.length > 0 && (
+                <>
+                  <Divider label="Associated Detectors" />
+                  <div className="detector-tag-container">
+                    {detectorIds.map(id => {
+                      const cnt = detections.filter(d => d.detector_id === id).length;
+                      return (
+                        <div key={id} className="detector-tag-badge">
+                          {id} <span style={{ opacity: 0.6, marginLeft: 2 }}>×{cnt}</span>
+                        </div>
+                      );
+                    })}
                   </div>
-                );
-              })}
+                </>
+              )}
+
+              {/* Detection sessions timeline */}
+              <Divider label="Activity Timeline" />
+              <div className="drone-chart-card">
+                <DetectionTimeline detections={detections} />
+              </div>
+
+              {/* RSSI sparkline */}
+              {detections.length >= 2 && (
+                <>
+                  <Divider label="RSSI Signal Strength" />
+                  <div className="drone-chart-card">
+                    <SignalSparkline detections={detections} width={320} height={40} />
+                  </div>
+                </>
+              )}
+
+              {/* Time Log */}
+              <Divider label="Time Log" />
+              <div style={{ display:'grid', gridTemplateColumns:'1fr', gap:7 }}>
+                <F label="First Seen" value={firstSeen ? formatDate(firstSeen) : '—'} color="#999" icon={icons.clock} />
+                <F label="Last Seen"  value={lastSeen  ? formatDate(lastSeen)  : '—'} color="#999" icon={icons.clock} />
+              </div>
             </div>
-          </>}
-
-          {/* Timestamps */}
-          <Divider label="Timeline" />
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:7 }}>
-            <F label="First Seen" value={firstSeen ? formatDate(firstSeen) : '—'} color="#888" />
-            <F label="Last Seen"  value={lastSeen  ? formatDate(lastSeen)  : '—'} color="#888" />
+            
           </div>
-
-          {/* Detection sessions timeline */}
-          <div style={{ marginTop:4 }}>
-            <DetectionTimeline detections={detections} />
-          </div>
-
-          {/* RSSI sparkline */}
-          {detections.length >= 2 && (
-            <div style={{ marginTop:2 }}>
-              <SignalSparkline detections={detections} width={360} height={40} />
-            </div>
-          )}
-
           <div style={{ height:4 }} />
         </div>
 
         {/* ── Footer ── */}
-        <div style={{ padding:'0 18px 16px', flexShrink:0 }}>
-          <button onClick={onClose} className="modal-action-btn">
-            Close
+        <div style={{ padding:'0 16px 12px', flexShrink:0 }}>
+          <button onClick={onClose} className="drone-modal-action-btn">
+            Close Profile
           </button>
         </div>
       </div>

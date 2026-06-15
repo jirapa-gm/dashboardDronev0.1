@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { GROUP_COLOR, MODEL_COLORS, THREAT_COLOR } from '../shared/constants';
 import { buildModelDist, buildDirDist } from '../shared/helpers';
+import { CompassIcon, SignalIcon, DroneIcon } from '../shared/icons';
 import { ModelDonutChart, MiniDirRose } from './Charts';
 
 // ── Summary shared helpers ────────────────────────────────────────────────────
@@ -17,7 +18,7 @@ function buildSummaryKpis(evts) {
     { label:'Unique Drones',  value:uniq,             color:'#38bdf8' },
     { label:'Avg RSSI',       value:`${avgRssi} dBm`, color:'#a78bfa' },
     { label:'Avg Distance',   value:`${avgDist} m`,   color:'#34d399' },
-    { label:'Critical Proto', value:critical,          color:'#ef4444' },
+    { label:'Critical Proto', value:critical,         color:'#ef4444' },
     { label:'Unregistered',  value:unregistered,      color:'#f97316' },
   ];
 }
@@ -51,11 +52,15 @@ function ChartsRow({ modelDist, dirDist, color }) {
   return (
     <div className="grid-charts-row">
       <div className="chart-card-styled">
-        <div className="chart-card-title">🔵 Drone Models Detected</div>
+        <div className="chart-card-title" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <DroneIcon className="w-3.5 h-3.5" style={{ color: '#38bdf8' }} /> Drone Models Detected
+        </div>
         <ModelDonutChart data={modelDist} colors={MODEL_COLORS} />
       </div>
       <div className="chart-card-styled flex-col-center">
-        <div className="chart-card-title" style={{ alignSelf: 'flex-start' }}>🧭 Most Detected Direction</div>
+        <div className="chart-card-title" style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <CompassIcon className="w-3.5 h-3.5" style={{ color }} /> Most Detected Direction
+        </div>
         <MiniDirRose dirData={dirDist} color={color} />
       </div>
     </div>
@@ -65,7 +70,12 @@ function ChartsRow({ modelDist, dirDist, color }) {
 function EmptyMsg({ label }) {
   return (
     <div className="flex-1 flex-center-all bg-dark-0a">
-      <div className="text-center"><div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📡</div><div style={{ color: '#555', fontSize: '1rem' }}>{label}</div></div>
+      <div className="text-center">
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1rem' }}>
+          <SignalIcon className="w-10 h-10" style={{ color: '#333' }} />
+        </div>
+        <div style={{ color: '#555', fontSize: '1rem' }}>{label}</div>
+      </div>
     </div>
   );
 }
@@ -226,11 +236,15 @@ export function DetectorSummary({ detectorId, events }) {
         <KpiStrip kpis={kpis}/>
         <div className="grid-charts-row">
           <div className="chart-card-styled">
-            <div className="chart-card-title">🔵 Drone Models</div>
+            <div className="chart-card-title" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <DroneIcon className="w-3.5 h-3.5" style={{ color: '#38bdf8' }} /> Drone Models
+            </div>
             <ModelDonutChart data={modelDist} colors={MODEL_COLORS}/>
           </div>
           <div className="chart-card-styled flex-col-center">
-            <div className="chart-card-title" style={{ alignSelf: 'flex-start' }}>🧭 Direction</div>
+            <div className="chart-card-title" style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <CompassIcon className="w-3.5 h-3.5" style={{ color: groupColor }} /> Direction
+            </div>
             <MiniDirRose dirData={dirDist} color={groupColor}/>
           </div>
         </div>
@@ -263,8 +277,8 @@ export function DetectorSummary({ detectorId, events }) {
                         <td className="table-cell font-mono" style={{ fontSize: '12px', color:(e.estimated_distance_m??999)<100?'#ef4444':'#777' }}>{e.estimated_distance_m??'—'} m</td>
                         <td className="table-cell font-mono" style={{ fontSize: '12px', color:(e.rssi_dbm??0)>-65?'#22c55e':(e.rssi_dbm??0)>-75?'#f97316':'#ef4444' }}>{e.rssi_dbm??'—'}</td>
                         <td className="table-cell font-mono" style={{ fontSize: '12px', color: '#777' }}>{e.snr_db??'—'}</td>
-                        <td className="table-cell" style={{ fontSize: '11px', color: e.has_gps?'#22c55e':'#ef4444' }}>{e.has_gps?'✅':'❌'}</td>
-                        <td className="table-cell" style={{ fontSize: '11px' }}>{e.registered?'🟢':'🔴'}</td>
+                        <td className="table-cell font-mono" style={{ fontSize: '11px', color: e.has_gps?'#22c55e':'#ef4444', fontWeight: 'bold' }}>{e.has_gps?'✓ Yes':'✗ No'}</td>
+                        <td className="table-cell font-mono" style={{ fontSize: '11px', color: e.registered?'#22c55e':'#ef4444', fontWeight: 'bold' }}>{e.registered?'✓ Yes':'✗ No'}</td>
                         <td className="table-cell font-mono" style={{ fontSize: '11px', color: '#666', whiteSpace: 'nowrap' }}>{e.aoa_degrees!=null?`${e.aoa_degrees}°`:'—'}</td>
                         <td className="table-cell font-mono" style={{ fontSize: '12px', fontWeight: 'bold', color:groupColor }}>{e.direction??'—'}</td>
                       </tr>

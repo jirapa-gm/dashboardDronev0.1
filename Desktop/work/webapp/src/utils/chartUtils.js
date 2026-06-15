@@ -100,13 +100,14 @@ export function buildKPIs(events) {
 }
 //คำนวนความถี่ คัดแยก นับจำนวน
 export function buildFreqBands(events) {
-  const bands = { '2400–2430': 0, '2430–2460': 0, '2460–2500': 0 };
+  const bands = { '2400–2430': 0, '2430–2460': 0, '2460–2500': 0, '5725–5875': 0 };
   events.forEach((e) => {
     const f = parseFloat(e.freq);
     if (isNaN(f)) return;
     if (f >= 2400 && f < 2430) bands['2400–2430']++;
     else if (f >= 2430 && f < 2460) bands['2430–2460']++;
     else if (f >= 2460 && f <= 2500) bands['2460–2500']++;
+    else if (f >= 5725 && f <= 5875) bands['5725–5875']++;
   });
   return Object.entries(bands).map(([band, count]) => ({ band, count }));
 }

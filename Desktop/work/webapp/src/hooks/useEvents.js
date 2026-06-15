@@ -171,7 +171,7 @@ const fetchEvents = async (isMock, params) => {
   return result;
 };
 
-export function useEvents(isMockMode, activeTab) {
+export function useEvents(isMockMode, activeTab, simMode = false, simulatedEvents = []) {
   const [searchParams, setSearchParams] = useState(() => ({
     startDate: isMockMode ? '2026-04-01' : toDateStr(new Date(Date.now() - 7 * 86400000)),
     endDate: isMockMode ? '2026-04-10' : toDateStr(new Date()),
@@ -224,17 +224,49 @@ export function useEvents(isMockMode, activeTab) {
     setCurrentPage(1);
   }, []);
 
+  let retEvents = telemetryData?.events ?? [];
+  let retSummary = analyticsData?.summary ?? EMPTY_SUMMARY;
+  let retDaily = analyticsData?.daily ?? {};
+  let retHourly = analyticsData?.hourly ?? [];
+  let retDirections = analyticsData?.directions ?? [];
+  let retFreqBands = analyticsData?.freqBands ?? [];
+  let retDroneStats = analyticsData?.droneStats ?? [];
+  let retModelCount = analyticsData?.modelCount ?? [];
+  let retProtocolSummary = analyticsData?.protocolSummary ?? [];
+
+  if (simMode) {
+    retEvents = simulatedEvents;
+    retSummary = {
+        total:         simulatedEvents.length,
+        ga:            simulatedEvents.filter(e => e.group === 'GA').length,
+        gb:            simulatedEvents.filter(e => e.group === 'GB').length,
+        unique_drones: new Set(simulatedEvents.map(e => e.drone_id)).size,
+        detectors:     new Set(simulatedEvents.map(e => e.detector_id).filter(Boolean)).size,
+        avg_speed:     simulatedEvents.length ? (simulatedEvents.reduce((s, e) => s + e.speed,  0) / simulatedEvents.length).toFixed(1)  : '—',
+        avg_height:    simulatedEvents.length ? Math.round(simulatedEvents.reduce((s, e) => s + e.height, 0) / simulatedEvents.length)   : '—',
+        max_speed:     simulatedEvents.length ? Math.max(...simulatedEvents.map(e => e.speed)).toFixed(1)                         : '—',
+        high_threat:   simulatedEvents.filter(e => e.threat === 'HIGH').length,
+    };
+    retDaily = buildDailyMap(simulatedEvents);
+    retHourly = buildHourlyMap(simulatedEvents);
+    retDirections = buildDirectionMap(simulatedEvents);
+    retFreqBands = buildFreqBands(simulatedEvents);
+    retDroneStats = buildDroneStats(simulatedEvents);
+    retModelCount = buildDistribution(simulatedEvents, 'model');
+    retProtocolSummary = buildDistribution(simulatedEvents, 'protocol_name');
+  }
+
   return {
-    events:          telemetryData?.events ?? [],
-    summary:         analyticsData?.summary ?? EMPTY_SUMMARY,
-    daily:           analyticsData?.daily ?? {},
-    hourly:          analyticsData?.hourly ?? [],
-    directions:      analyticsData?.directions ?? [],
-    freqBands:       analyticsData?.freqBands ?? [],
-    droneStats:      analyticsData?.droneStats ?? [],
-    modelCount:      analyticsData?.modelCount ?? [],
-    protocolSummary: analyticsData?.protocolSummary ?? [],
-    isLoading:       isTelemetryLoading || isAnalyticsLoading,
+    events:          retEvents,
+    summary:         retSummary,
+    daily:           retDaily,
+    hourly:          retHourly,
+    directions:      retDirections,
+    freqBands:       retFreqBands,
+    droneStats:      retDroneStats,
+    modelCount:      retModelCount,
+    protocolSummary: retProtocolSummary,
+    isLoading:       (!simMode) && (isTelemetryLoading || isAnalyticsLoading),
     search,
     currentPage,
     setCurrentPage,

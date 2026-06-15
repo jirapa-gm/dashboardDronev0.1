@@ -16,7 +16,14 @@ export default function DroneIntelTable({ droneStats, onDroneClick }) {
     if (search)            arr = arr.filter(d => d.drone_id?.toLowerCase().includes(search.toLowerCase()) || d.model?.toLowerCase().includes(search.toLowerCase()));
     if (groupF  !== 'ALL') arr = arr.filter(d => d.group  === groupF);
     if (threatF !== 'ALL') arr = arr.filter(d => d.threat === threatF);
-    return [...arr].sort((a, b) => sort.dir * (String(a[sort.key]) < String(b[sort.key]) ? -1 : 1));
+    return [...arr].sort((a, b) => {
+      const valA = a[sort.key];
+      const valB = b[sort.key];
+      if (typeof valA === 'number' && typeof valB === 'number') {
+        return sort.dir * (valA - valB);
+      }
+      return sort.dir * String(valA).localeCompare(String(valB));
+    });
   }, [droneStats, sort, search, groupF, threatF]);
 
   const totalPages = Math.max(1, Math.ceil(sorted.length / PER));

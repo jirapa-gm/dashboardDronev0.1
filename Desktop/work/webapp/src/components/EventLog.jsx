@@ -6,8 +6,6 @@ import DroneHistoryPanel from './DroneHistoryPanel';
 import DroneIntelTable from './DroneIntelTable';
 import { exportCSV } from '../utils/csvExporter';
 
-
-
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function EventLog({ events, droneStats, isLoading, currentPage, setCurrentPage, onSearch, defaultStartDate, defaultEndDate }) {
   const [selectedDroneId, setSelectedDroneId] = useState(null);
@@ -29,10 +27,30 @@ export default function EventLog({ events, droneStats, isLoading, currentPage, s
         <div className="date-range-bar">
           <span style={{ fontSize: 12, color: '#666', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 'semibold', whiteSpace: 'nowrap' }}>Date Range</span>
           <div className="flex-row-center gap-2 flex-wrap flex-1">
-            <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="date-input-styled" />
+            <input 
+              type="date" 
+              value={startDate} 
+              onChange={e => setStartDate(e.target.value)} 
+              onClick={e => {
+                try {
+                  e.target.showPicker();
+                } catch (err) {}
+              }}
+              className="date-input-styled" 
+            />
             <span style={{ fontSize: 12, color: '#555' }}>—</span>
-            <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="date-input-styled" />
-            <button onClick={handleSearch} disabled={isLoading} className="btn btn-ghost flex-row-center gap-1-5" style={{ padding: '0.25rem 0.625rem', fontSize: '12px' }}>
+            <input 
+              type="date" 
+              value={endDate} 
+              onChange={e => setEndDate(e.target.value)} 
+              onClick={e => {
+                try {
+                  e.target.showPicker();
+                } catch (err) {}
+              }}
+              className="date-input-styled" 
+            />
+            <button onClick={handleSearch} disabled={isLoading} className="btn btn-secondary flex-row-center gap-1-5">
               {isLoading
                 ? <><div className="spinner-small-white animate-spin" />Searching…</>
                 : <><SearchIcon style={{ width: '0.75rem', height: '0.75rem', color: '#ea580c' }} />Search</>}

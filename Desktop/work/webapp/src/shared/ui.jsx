@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { GA, GB } from './constants';
-import { ChevronIcon } from './icons';
+import { ChevronIcon, SignalIcon } from './icons';
 
 // ── Loading spinner ───────────────────────────────────────────────────────────
 export function Spinner({ label = '' }) {
@@ -15,11 +15,12 @@ export function Spinner({ label = '' }) {
 }
 
 // ── Empty state ───────────────────────────────────────────────────────────────
-export function EmptyState({ icon = '📊', message = 'No data', sub = '' }) {
+export function EmptyState({ icon, message = 'No data', sub = '' }) {
+  const finalIcon = icon || <SignalIcon className="w-8 h-8 mx-auto" style={{ color: '#444' }} />;
   return (
     <div className="flex-1 flex-center-all bg-dark-0f">
-      <div className="text-center">
-        <div style={{ fontSize: '2.25rem', marginBottom: '0.75rem' }}>{icon}</div>
+      <div className="text-center" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ marginBottom: '0.75rem', display: 'flex', justifyContent: 'center' }}>{finalIcon}</div>
         <div style={{ color: '#555', fontSize: '0.875rem' }}>{message}</div>
         {sub && <div style={{ color: '#444', fontSize: '0.75rem', marginTop: '0.25rem' }}>{sub}</div>}
       </div>

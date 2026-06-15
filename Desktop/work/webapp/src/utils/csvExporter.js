@@ -6,19 +6,19 @@ export function exportCSV(droneStats) {
     'first_seen','last_seen',
   ];
   const rows = droneStats.map(d => [
-    d.drone_id,
+    d.drone_id ?? '',
     `"${(d.model ?? '').replace(/"/g,'""')}"`,
-    d.group,
-    d.detections,
-    d.threat,
-    d.maxHeight,
-    d.maxSpeed,
-    d.avgSpeed,
+    d.group ?? '',
+    d.detections ?? 0,
+    d.threat ?? '',
+    d.maxHeight ?? 0,
+    d.maxSpeed ?? 0,
+    d.avgSpeed ?? 0,
     `"${d.protocols?.join('; ') ?? ''}"`,
     `"${d.freqs?.join('; ') ?? ''}"`,
     `"${d.directions?.join(' ') ?? ''}"`,
-    d.firstSeen,
-    d.lastSeen,
+    d.firstSeen ?? '',
+    d.lastSeen ?? '',
   ].join(','));
   const blob = new Blob(['\uFEFF' + [headers.join(','), ...rows].join('\n')], { type: 'text/csv;charset=utf-8;' });
   const url  = URL.createObjectURL(blob);

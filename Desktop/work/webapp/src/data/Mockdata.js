@@ -55,19 +55,13 @@ raw.groups.forEach((g) => {
     const sgNode = { subgroup: sg.subgroup, detectors: [] };
 
     sg.detectors.forEach((det) => {
-      const evts   = det.data.events;
-      const detLat = evts.reduce((s, e) => s + e.latitude,  0) / evts.length;
-      const detLon = evts.reduce((s, e) => s + e.longitude, 0) / evts.length;
+      const detLat = det.latitude;
+      const detLon = det.longitude;
 
       sgNode.detectors.push({ id: det.detector_id, name: det.name, lat: detLat, lon: detLon });
 
-      evts.forEach((evt, idx) => {
-        const baseDate = new Date(evt.datetime);
-        if (isNaN(baseDate.getTime())) return;
-
-        const hour = (idx * 2 + 8) % 24;
-        baseDate.setHours(hour, (idx * 7) % 60, 0, 0);
-
+      const evts = det.data.events;
+      evts.forEach((evt) => {
         const bearing  = calcBearing(detLat, detLon, evt.latitude, evt.longitude);
         const protocol = freqToProtocol(evt.freq);
         const threat   = calcThreat(evt.height, evt.speed, evt.protocol_name ?? '');
@@ -82,7 +76,6 @@ raw.groups.forEach((g) => {
 
         mockData.push({
           ...evt,
-          datetime:               baseDate.toISOString().replace('.000Z', ''),
           group:                  g.group,
           subgroup:               sg.subgroup,
           detector_id:            det.detector_id,
@@ -98,7 +91,7 @@ raw.groups.forEach((g) => {
           pilot_lat:              evt.pilot_lat ?? null,
           pilot_lng:              evt.pilot_lng ?? null,
           aoa_degrees:            evt.aoa_degrees ?? null,
-          estimated_distance_m:   evt.estimated_distance_m ?? null,
+          estimated_distance_m:   evt.estimated_distance_m ?? Math.round(haversineDistance(detLat, detLon, evt.latitude, evt.longitude)),
           rssi_dbm:               evt.rssi_dbm ?? null,
           snr_db:                 evt.snr_db ?? null,
           protocol_name:          evt.protocol_name ?? 'Unknown',

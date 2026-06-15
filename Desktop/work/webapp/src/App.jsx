@@ -9,6 +9,7 @@ import TabBar             from './components/TabBar';
 import Breadcrumb         from './components/Breadcrumb';
 import SwipeHint          from './components/SwipeHint';
 import { useEvents }      from './hooks/useEvents';
+import { useSimulation }  from './hooks/useSimulation';
 import { useIsMobile }    from './hooks/useIsMobile';
 import { useSwipe }       from './hooks/useSwipe';
 import { toDateStr }      from './shared/helpers';
@@ -35,11 +36,13 @@ export default function App() {
   const { onStart, onEnd } = useSwipe(sidebarVisible, setSidebarVisible);
   useEffect(() => { setSidebarVisible(!isMobile); }, [isMobile]);
 
+  const simContext = useSimulation();
+
   const {
     events, summary, daily, hourly, directions, freqBands, droneStats,
     modelCount, protocolSummary,
     isLoading, currentPage, setCurrentPage, search
-  } = useEvents(isMockMode, activeTab);
+  } = useEvents(isMockMode, activeTab, simContext.simMode, simContext.simulatedEvents);
   const defaultDates = getDefaultDates(isMockMode);
 
   const handleSearch = useCallback((params) => {
@@ -64,7 +67,8 @@ export default function App() {
          onTouchEnd={isMobile   ? onEnd   : undefined}>
 
       <Navbar isMockMode={isMockMode} setIsMockMode={setIsMockMode}
-              sidebarVisible={sidebarVisible} setSidebarVisible={setSidebarVisible} />
+              sidebarVisible={sidebarVisible} setSidebarVisible={setSidebarVisible}
+              activeTab={activeTab} />
 
       {/* TabBar is always visible — no longer replaced by Breadcrumb */}
       <TabBar activeTab={activeTab} setActiveTab={setActiveTab} eventCount={events.length} />
@@ -110,7 +114,7 @@ export default function App() {
             )}
           </>}
 
-          {activeTab === 'tactical' && <TacticalMapView events={events} isLoading={isLoading} />}
+          {activeTab === 'tactical' && <TacticalMapView events={events} isLoading={isLoading} simContext={simContext} />}
           {activeTab === 'log'      && (
             <EventLog
               events={events} droneStats={droneStats} isLoading={isLoading}
