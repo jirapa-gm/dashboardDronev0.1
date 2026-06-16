@@ -15,19 +15,19 @@ export default function SimConfigPanel({ onStart, detectorCount, onClose }) {
         borderRadius: '12px', padding: '24px', width: '420px', maxWidth: '90vw',
         boxShadow: '0 20px 40px rgba(0,0,0,0.8)', color: '#fff', fontFamily: 'system-ui, sans-serif'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+        <div className="sim-panel-header">
           <GamepadIcon className="w-8 h-8 text-orange-500" />
           <div>
-            <div style={{ fontSize: '18px', fontWeight: 'bold' }}>Simulation Setup</div>
-            <div style={{ fontSize: '12px', color: '#888' }}>{detectorCount} detectors loaded</div>
+            <div className="sim-panel-title">Simulation Setup</div>
+            <div className="sim-panel-subtitle">{detectorCount} detectors loaded</div>
           </div>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div className="sim-panel-body">
           {/* Number of drones */}
           <div>
-            <label style={{ display: 'block', fontSize: '11px', color: '#aaa', marginBottom: '6px', fontWeight: 'bold', textTransform: 'uppercase' }}>Number of Drones</label>
-            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+            <label className="sim-panel-label">Number of Drones</label>
+            <div className="sim-panel-btn-group">
               {[1, 2, 3, 5, 10, 20].map(n => (
                 <button key={n}
                   style={{
@@ -43,8 +43,8 @@ export default function SimConfigPanel({ onStart, detectorCount, onClose }) {
 
           {/* Duration */}
           <div>
-            <label style={{ display: 'block', fontSize: '11px', color: '#aaa', marginBottom: '6px', fontWeight: 'bold', textTransform: 'uppercase' }}>Duration</label>
-            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+            <label className="sim-panel-label">Duration</label>
+            <div className="sim-panel-btn-group">
               {[{v:60,l:'1 min'},{v:120,l:'2 min'},{v:180,l:'3 min'},{v:300,l:'5 min'}].map(({v,l}) => (
                 <button key={v}
                   style={{
@@ -60,8 +60,8 @@ export default function SimConfigPanel({ onStart, detectorCount, onClose }) {
 
           {/* Group */}
           <div>
-            <label style={{ display: 'block', fontSize: '11px', color: '#aaa', marginBottom: '6px', fontWeight: 'bold', textTransform: 'uppercase' }}>Group</label>
-            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+            <label className="sim-panel-label">Group</label>
+            <div className="sim-panel-btn-group">
               {[{v:'mixed',l:'GA + GB'},{v:'GA',l:'GA Only'},{v:'GB',l:'GB Only'}].map(({v,l}) => (
                 <button key={v}
                   style={{
@@ -76,15 +76,15 @@ export default function SimConfigPanel({ onStart, detectorCount, onClose }) {
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
+        <div className="sim-panel-footer">
           <button
-            style={{ flex: 1, padding: '10px', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#ccc', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+            className="sim-panel-cancel-btn"
             onClick={onClose}
           >
             <CloseIcon className="w-4 h-4" /> Cancel
           </button>
           <button
-            style={{ flex: 2, padding: '10px', borderRadius: '8px', background: '#f97316', border: 'none', color: '#fff', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+            className="sim-panel-start-btn"
             onClick={() => onStart({ numDrones, durationSec, entryDir, group, spawnInterval })}
           >
             <PlayIcon className="w-4 h-4 fill-current" /> Start Simulation

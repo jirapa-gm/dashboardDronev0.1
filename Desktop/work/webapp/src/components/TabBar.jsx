@@ -1,3 +1,4 @@
+import './Minors.css';
 import { BarChartIcon, TargetIcon, LogIcon } from '../shared/icons';
 
 const TABS = [
@@ -14,13 +15,13 @@ export default function TabBar({ activeTab, setActiveTab, eventCount }) {
         const active = activeTab === id;
         const badge  = id === 'log' ? eventCount : null;
         return (
-          <button key={id} onClick={() => setActiveTab(id)} style={{ marginBottom: '-1px' }}
+          <button key={id} onClick={() => setActiveTab(id)} className="tabbar-btn-base"
             className={`tabbar-btn ${active ? 'active' : 'inactive'}`}>
             <Icon active={active} />
             <span className="hidden sm:inline">{label}</span>
             {badge !== null && (
               <span className="rounded font-semibold"
-                    style={{ fontSize: '8px', padding: '2px 6px', background: active ? `${BADGE_COLOR}20` : '#1a1a1a', color: active ? BADGE_COLOR : '#555', border: `1px solid ${active ? `${BADGE_COLOR}40` : '#2a2a2a'}` }}>
+                    className="rounded-full font-bold tabbar-badge" style={{ background: active ? `${BADGE_COLOR}20` : '#1a1a1a', color: active ? BADGE_COLOR : '#555', border: `1px solid ${active ? `${BADGE_COLOR}40` : '#2a2a2a'}` }}>
                 {badge}
               </span>
             )}

@@ -1,3 +1,4 @@
+import './DroneTables.css';
 import { useState, useMemo } from 'react';
 import { THREAT_COLOR, GA, GB } from '../shared/constants';
 import { formatDate } from '../shared/helpers';
@@ -35,32 +36,32 @@ export default function DroneIntelTable({ droneStats, onDroneClick }) {
 
   return (
     <>
-      <div className="flex-row-center gap-2 flex-wrap" style={{ marginBottom: 12 }}>
-        <div className="relative flex-1" style={{ minWidth: 160 }}>
+      <div className="dit-controls-row flex-row-center gap-2 flex-wrap">
+        <div className="dit-search-wrap relative flex-1">
           <input type="text" placeholder="Search drone ID / model…" value={search}
             onChange={e => { setSearch(e.target.value); setPage(1); }}
             className="search-input-styled" />
-          <SearchIcon className="absolute text-[#666]" style={{ left: '0.625rem', top: '50%', transform: 'translateY(-50%)', width: '0.75rem', height: '0.75rem' }} />
+          <SearchIcon className="dit-search-icon absolute text-[#666]" />
         </div>
         {[
           ['threatF', setThreatF, threatF, [['ALL','All Threats'],['HIGH','HIGH'],['MEDIUM','MEDIUM'],['LOW','LOW']]]
         ].map(([, setter, val, opts]) => (
           <select key={val} value={val} onChange={e => { setter(e.target.value); setPage(1); }}
-            className="select-styled" style={{ padding: '0.375rem 0.5rem' }}>
+            className="select-styled dit-select">
             {opts.map(([v,l]) => <option key={v} value={v}>{l}</option>)}
           </select>
         ))}
-        <span className="font-mono" style={{ fontSize: 12, color: '#666', marginLeft: 'auto' }}>{sorted.length} drones</span>
+        <span className="font-mono" className="dit-count-label font-mono">{sorted.length} drones</span>
       </div>
 
-      <div className="table-wrapper rounded-lg" style={{ border: '1px solid #222' }}>
-        <table className="table-main" style={{ minWidth: '720px' }}>
-          <thead className="table-header" style={{ position: 'sticky', top: 0, zIndex: 10 }}>
+      <div className="dit-table-wrap table-wrapper rounded-lg">
+        <table className="dit-table-main table-main">
+          <thead className="dit-table-head table-header">
             <tr>
               {th('drone_id','Drone ID')}{th('model','Model')}{th('group','Group')}{th('detections','Events')}
               {th('threat','Threat')}{th('maxHeight','Max H')}{th('maxSpeed','Max Spd')}{th('avgSpeed','Avg Spd')}
               {th('protocols','Protocol')}
-              <th className="th-sortable" style={{ cursor: 'default' }}>Dirs</th>
+              <th className="th-sortable dit-th-nosort">Dirs</th>
               {th('firstSeen','First Seen')}{th('lastSeen','Last Seen')}
             </tr>
           </thead>
@@ -69,19 +70,19 @@ export default function DroneIntelTable({ droneStats, onDroneClick }) {
               const tc = THREAT_COLOR[d.threat] ?? '#888';
               const gc = d.group === 'GA' ? GA : GB;
               return (
-                <tr key={d.drone_id} className="table-body-row" style={{ cursor: 'pointer' }} onClick={() => onDroneClick(d.drone_id)}>
-                  <td className="table-cell font-mono" style={{ fontWeight: 'bold', color: gc }}>{d.drone_id}</td>
-                  <td className="table-cell" style={{ color: '#ddd', whiteSpace: 'nowrap' }}>{d.model}</td>
-                  <td className="table-cell"><span className="rounded-full font-bold" style={{ fontSize: '10px', padding: '2px 6px', background:`${gc}22`, color:gc, border:`1px solid ${gc}44` }}>{d.group}</span></td>
-                  <td className="table-cell font-mono" style={{ fontWeight: 'bold', color: '#fff' }}>{d.detections}</td>
-                  <td className="table-cell"><span className="rounded font-bold" style={{ fontSize: '10px', padding: '2px 6px', background:`${tc}22`, color:tc }}>{d.threat}</span></td>
-                  <td className="table-cell font-mono" style={{ color: '#aaa' }}>{d.maxHeight} m</td>
-                  <td className="table-cell font-mono" style={{ color: '#aaa' }}>{d.maxSpeed} m/s</td>
-                  <td className="table-cell font-mono" style={{ color: '#aaa' }}>{d.avgSpeed} m/s</td>
-                  <td className="table-cell" style={{ color: '#888' }}>{d.protocols?.join(', ') || '—'}</td>
-                  <td className="table-cell font-mono" style={{ color: '#888' }}>{d.directions?.join(' ') || '—'}</td>
-                  <td className="table-cell font-mono" style={{ color: '#777', whiteSpace: 'nowrap' }}>{formatDate(d.firstSeen)}</td>
-                  <td className="table-cell font-mono" style={{ color: '#777', whiteSpace: 'nowrap' }}>{formatDate(d.lastSeen)}</td>
+                <tr key={d.drone_id} className="table-body-row dit-tr-clickable" onClick={() => onDroneClick(d.drone_id)}>
+                  <td className="table-cell font-mono dit-td-id" style={{ color: gc }}>{d.drone_id}</td>
+                  <td className="table-cell" className="table-cell dit-td-model">{d.model}</td>
+                  <td className="table-cell"><span className="rounded-full font-bold" className="rounded-full font-bold dit-badge-group" style={{ background:`${gc}22`, color:gc, border:`1px solid ${gc}44` }}>{d.group}</span></td>
+                  <td className="table-cell font-mono" className="table-cell font-mono dit-td-det">{d.detections}</td>
+                  <td className="table-cell"><span className="rounded font-bold" className="rounded font-bold dit-badge-threat" style={{ background:`${tc}22`, color:tc }}>{d.threat}</span></td>
+                  <td className="table-cell font-mono dit-td-measure">{d.maxHeight} m</td>
+                  <td className="table-cell font-mono dit-td-measure">{d.maxSpeed} m/s</td>
+                  <td className="table-cell font-mono dit-td-measure">{d.avgSpeed} m/s</td>
+                  <td className="table-cell" className="table-cell dit-td-proto">{d.protocols?.join(', ') || '—'}</td>
+                  <td className="table-cell font-mono dit-td-proto">{d.directions?.join(' ') || '—'}</td>
+                  <td className="table-cell font-mono dit-td-date">{formatDate(d.firstSeen)}</td>
+                  <td className="table-cell font-mono dit-td-date">{formatDate(d.lastSeen)}</td>
                 </tr>
               );
             })}
@@ -90,9 +91,9 @@ export default function DroneIntelTable({ droneStats, onDroneClick }) {
       </div>
 
       {totalPages > 1 && (
-        <div className="flex-row-between" style={{ marginTop: 8 }}>
+        <div className="dit-pagination-row flex-row-between">
           <button disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="pagination-btn">← Prev</button>
-          <span className="font-mono" style={{ fontSize: 9, color: '#555' }}>Page {page} / {totalPages}</span>
+          <span className="font-mono" className="dit-page-info font-mono">Page {page} / {totalPages}</span>
           <button disabled={page >= totalPages} onClick={() => setPage(p => p + 1)} className="pagination-btn">Next →</button>
         </div>
       )}

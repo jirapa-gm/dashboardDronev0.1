@@ -83,7 +83,7 @@ export function buildPdfHtml({
       const detCount = subgroups.reduce((s, g) => s + g.detectors.length, 0);
       return `
         <div class="card" style="margin-bottom:12px">
-          <div class="card-hd">🗂 Group ${groupFilter} — Overview</div>
+          <div class="card-hd"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:middle;margin-right:4px;margin-top:-2px"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg> Group ${groupFilter} — Overview</div>
           <div class="card-bd" style="display:flex;gap:24px;align-items:center">
             <div><div class="klabel">Subgroups</div><div class="kval" style="color:${groupColor}">${sgCount}</div></div>
             <div><div class="klabel">Detectors</div><div class="kval" style="color:#0284c7">${detCount}</div></div>
@@ -100,7 +100,7 @@ export function buildPdfHtml({
         </tr>`).join('');
       return `
         <div class="card" style="margin-bottom:12px">
-          <div class="card-hd">🗂 Subgroup Breakdown — Group ${groupFilter}</div>
+          <div class="card-hd"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:middle;margin-right:4px;margin-top:-2px"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg> Subgroup Breakdown — Group ${groupFilter}</div>
           <div class="card-bd">
             <table style="width:100%;border-collapse:collapse;font-size:9px">
               <thead>
@@ -129,7 +129,7 @@ export function buildPdfHtml({
 
     return `
       <div class="card" style="margin-bottom:12px">
-        <div class="card-hd">🗂 Detector List — Group ${groupFilter}</div>
+        <div class="card-hd"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:middle;margin-right:4px;margin-top:-2px"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg> Detector List — Group ${groupFilter}</div>
         <div class="card-bd">
           <table style="width:100%;border-collapse:collapse;font-size:9px">
             <thead>
@@ -184,7 +184,7 @@ export function buildPdfHtml({
   <div class="header">
     <div>
       <div class="logo-area">
-        <span class="logo-sym">⬢</span>
+        <span class="logo-sym"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:middle"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></span>
         <span class="title">DRONE SENTINEL</span>
       </div>
       <div class="sub">Detection &amp; Intelligence Analytics Report</div>
@@ -211,12 +211,12 @@ export function buildPdfHtml({
   <div class="g2">
     ${has('model') ? `
     <div class="card">
-      <div class="card-hd">🚁 Drone Model Distribution</div>
+      <div class="card-hd"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:middle;margin-right:4px;margin-top:-2px"><path d="M12 2a1 1 0 0 1 .894.553l3 6A1 1 0 0 1 15 10h-1v2h4a1 1 0 0 1 0 2h-4v2h1a1 1 0 0 1 .894 1.447l-3 6a1 1 0 0 1-1.788 0l-3-6A1 1 0 0 1 9 16h1v-2H6a1 1 0 0 1 0-2h4v-2H9a1 1 0 0 1-.894-1.447l3-6A1 1 0 0 1 12 2z"/></svg> Drone Model Distribution</div>
       <div class="card-bd">${modelRows}</div>
     </div>` : ''}
     ${has('protocol') ? `
     <div class="card">
-      <div class="card-hd">📶 Protocol &amp; Frequency Analysis</div>
+      <div class="card-hd"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:middle;margin-right:4px;margin-top:-2px"><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M10.3 16.1a6 6 0 0 1 3.4 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg> Protocol &amp; Frequency Analysis</div>
       <div class="card-bd">
         ${protoRows}
         <div style="margin-top:10px;padding-top:8px;border-top:1px dashed #e2e8f0">${freqRows}</div>
@@ -226,7 +226,7 @@ export function buildPdfHtml({
 
   ${has('direction') ? `
   <div class="card" style="margin-bottom:12px">
-    <div class="card-hd">🧭 Direction of Origin (Top Sectors)</div>
+    <div class="card-hd"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:middle;margin-right:4px;margin-top:-2px"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg> Direction of Origin (Top Sectors)</div>
     <div class="card-bd">
       <div class="dgrid">${topDirs}</div>
     </div>

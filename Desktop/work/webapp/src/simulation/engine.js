@@ -1,9 +1,4 @@
-/**
- * simulationEngine.js
- * Generates drone flight simulations through detector positions.
- * Drones fly from outside the bounding box, pass near detectors, then exit.
- */
-import { destPoint, haversine } from './mapUtils';
+import { destPoint, haversine } from '../utils/mapUtils';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const DETECTION_RADIUS_M = 800;   // meters — detector triggers within this range
@@ -22,10 +17,6 @@ function rnd(min, max) { return min + Math.random() * (max - min); }
 function rndInt(min, max) { return Math.floor(rnd(min, max + 1)); }
 function shuffle(arr) { return [...arr].sort(() => Math.random() - 0.5); }
 
-/**
- * Generate spawn point outside the bounding box from a given direction.
- * dir: 'N'|'S'|'E'|'W'|'NE'|'NW'|'SE'|'SW'|'random'
- */
 function spawnOutside(bounds, dir) {
   const { minLat, maxLat, minLon, maxLon } = bounds;
   const pad = 0.015; // ~1.5 km outside
@@ -46,10 +37,6 @@ function spawnOutside(bounds, dir) {
   }
 }
 
-/**
- * Build a flight path as a sequence of [lat, lon] waypoints.
- * Drone enters from outside, passes near 1-3 detectors, exits the other side.
- */
 function buildFlightPath(detectors, bounds, entryDir, exitDir) {
   const entryPt = spawnOutside(bounds, entryDir);
   const exitPt  = spawnOutside(bounds, exitDir);
@@ -106,9 +93,6 @@ function buildFlightPath(detectors, bounds, entryDir, exitDir) {
   return { waypoints: smoothed, passedDetectors: chosen.map(s => s.det) };
 }
 
-/**
- * Given a list of waypoints, compute the total path distance (meters).
- */
 function pathLength(waypoints) {
   let total = 0;
   for (let i = 1; i < waypoints.length; i++) {
@@ -117,10 +101,6 @@ function pathLength(waypoints) {
   return total;
 }
 
-/**
- * Interpolate position along waypoints at fraction t (0–1 of total distance).
- * Returns { lat, lon, heading }
- */
 function interpolateWaypoints(waypoints, t) {
   const total = pathLength(waypoints);
   const target = total * Math.max(0, Math.min(1, t));
@@ -299,10 +279,6 @@ export function generateSimulation({
   return { drones, detectionEvents, durationSec };
 }
 
-/**
- * Get current position of a drone at simulation time t (seconds).
- * Returns { lat, lon, heading, visible } or null if not yet spawned / already exited.
- */
 export function getDronePosition(drone, t) {
   if (t < drone.activeStart || t > drone.activeEnd) return null;
   const elapsed  = t - drone.activeStart;

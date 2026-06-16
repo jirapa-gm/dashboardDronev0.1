@@ -1,0 +1,187 @@
+/* DroneTables.css */
+
+/* Drone History Panel */
+.dh-card-bg {
+  background: rgba(20, 20, 20, 0.4);
+}
+.dh-stat-col {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+.dh-stat-val-text {
+  font-size: 14px;
+}
+.dh-header-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 4px 0;
+}
+.dh-header-label {
+  font-size: 8.5px;
+  color: #f97316;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-weight: 800;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+.dh-header-line {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(to right, rgba(249, 115, 22, 0.12), transparent);
+}
+.dh-modal-content {
+  max-width: 95vw;
+}
+.dh-modal-header {
+  background: rgba(25, 25, 25, 0.6);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 10px 16px;
+}
+.dh-modal-title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.dh-modal-icon-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+.dh-modal-id-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 3px;
+}
+.dh-modal-id-text {
+  font-size: 18px;
+  font-weight: 800;
+  font-family: monospace;
+  letter-spacing: 0.02em;
+  color: #fff;
+}
+.dh-modal-badge {
+  font-size: 7.5px;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+.dh-modal-subtitle {
+  font-size: 10px;
+  color: #777;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+.dh-modal-close-icon {
+  width: 10px;
+  height: 10px;
+}
+.dh-modal-body-scroll {
+  padding: 8px 16px 8px;
+  overflow-y: auto;
+  flex: 1;
+}
+.dh-grid-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+}
+.dh-grid-1col {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 7px;
+}
+.dh-array-item-count {
+  opacity: 0.6;
+  margin-left: 2px;
+}
+.dh-spacer-4 {
+  height: 4px;
+}
+.dh-modal-footer {
+  padding: 0 16px 12px;
+  flex-shrink: 0;
+}
+
+/* Drone Intel Table */
+.dit-controls-row {
+  margin-bottom: 12px;
+}
+.dit-search-wrap {
+  min-width: 160px;
+}
+.dit-search-icon {
+  left: 0.625rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 0.75rem;
+  height: 0.75rem;
+}
+.dit-select {
+  padding: 0.375rem 0.5rem;
+}
+.dit-count-label {
+  font-size: 12px;
+  color: #666;
+  margin-left: auto;
+}
+.dit-table-wrap {
+  border: 1px solid #222;
+}
+.dit-table-main {
+  min-width: 720px;
+}
+.dit-table-head {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.dit-th-nosort {
+  cursor: default;
+}
+.dit-tr-clickable {
+  cursor: pointer;
+}
+.dit-td-id {
+  font-weight: bold;
+}
+.dit-td-model {
+  color: #ddd;
+  white-space: nowrap;
+}
+.dit-badge-group {
+  font-size: 10px;
+  padding: 2px 6px;
+}
+.dit-td-det {
+  font-weight: bold;
+  color: #fff;
+}
+.dit-badge-threat {
+  font-size: 10px;
+  padding: 2px 6px;
+}
+.dit-td-measure {
+  color: #aaa;
+}
+.dit-td-proto {
+  color: #888;
+}
+.dit-td-date {
+  color: #777;
+  white-space: nowrap;
+}
+.dit-pagination-row {
+  margin-top: 8px;
+}
+.dit-page-info {
+  font-size: 9px;
+  color: #555;
+}

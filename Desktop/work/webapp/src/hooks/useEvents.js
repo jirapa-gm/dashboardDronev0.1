@@ -6,6 +6,7 @@ import {
   buildDailyMap, buildHourlyMap, buildDirectionMap,
   buildFreqBands, buildDroneStats, buildDistribution,
 } from '../utils/chartUtils';
+import { haversine } from '../utils/mapUtils';
 
 const API_URL = 'http://localhost:8000/api/events';
 
@@ -23,7 +24,9 @@ const fetchEvents = async (isMock, params) => {
   // ── MOCK mode ────────────────────────────────────────────────────────────
   if (isMock) {
     await new Promise(res => setTimeout(res, 200));
-    const filtered = mockData.filter(e => {
+    
+    // 1. Initial filter by standard criteria (date, group, detector)
+    const initialFiltered = mockData.filter(e => {
       const d = e.datetime.slice(0, 10);
       if (d < startDate || d > endDate)                                  return false;
       if (group    && group    !== 'ALL' && e.group       !== group)     return false;
@@ -31,6 +34,28 @@ const fetchEvents = async (isMock, params) => {
       if (detector && detector !== 'ALL' && e.detector_id !== detector)  return false;
       return true;
     });
+
+    // 2. Compute dynamic radii for each detector (simulate real-world radar reach)
+    const detRadii = {};
+    initialFiltered.forEach(e => {
+      if (!detRadii[e.detector_id]) detRadii[e.detector_id] = 800; // base minimum
+      if ((e.estimated_distance_m ?? 800) > detRadii[e.detector_id]) {
+        detRadii[e.detector_id] = e.estimated_distance_m;
+      }
+    });
+    Object.keys(detRadii).forEach(id => {
+      detRadii[id] = Math.min(detRadii[id] * 1.3 + 200, 5000); // add sweep buffer, cap at 5000m
+    });
+
+    // 3. Strict Real-World Filter: Must have GPS & be within sweep radius
+    const filtered = initialFiltered.filter(e => {
+      if (!e.latitude || !e.longitude) return false;
+      const radius = detRadii[e.detector_id] || 5000;
+      const dist = haversine(e.latitude, e.longitude, e.detector_lat, e.detector_lon);
+      return dist <= radius;
+    });
+
+    const noGpsCount = initialFiltered.filter(e => !e.has_gps).length;
 
     return {
       events: filtered,
@@ -40,10 +65,11 @@ const fetchEvents = async (isMock, params) => {
         gb:            filtered.filter(e => e.group === 'GB').length,
         unique_drones: new Set(filtered.map(e => e.drone_id)).size,
         detectors:     new Set(filtered.map(e => e.detector_id).filter(Boolean)).size,
-        avg_speed:     filtered.length ? (filtered.reduce((s, e) => s + e.speed,  0) / filtered.length).toFixed(1)  : '—',
-        avg_height:    filtered.length ? Math.round(filtered.reduce((s, e) => s + e.height, 0) / filtered.length)   : '—',
-        max_speed:     filtered.length ? Math.max(...filtered.map(e => e.speed)).toFixed(1)                         : '—',
+        avg_speed:     filtered.length ? (filtered.reduce((s, e) => s + (e.speed || 0), 0) / filtered.length).toFixed(1) : '—',
+        avg_height:    filtered.length ? Math.round(filtered.reduce((s, e) => s + (e.height || 0), 0) / filtered.length) : '—',
+        max_speed:     filtered.length ? Math.max(...filtered.map(e => e.speed || 0)).toFixed(1) : '—',
         high_threat:   filtered.filter(e => e.threat === 'HIGH').length,
+        no_gps:        noGpsCount,
       },
       daily: buildDailyMap(filtered),
       hourly: buildHourlyMap(filtered),

@@ -1,0 +1,100 @@
+.sim-panel-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+.sim-panel-card {
+  background: #111;
+  border: 1px solid #333;
+  padding: 24px;
+  border-radius: 12px;
+  width: 400px;
+  max-width: 90%;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+}
+.sim-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.sim-panel-title {
+  font-size: 18px;
+  font-weight: bold;
+}
+.sim-panel-subtitle {
+  font-size: 12px;
+  color: #888;
+}
+.sim-panel-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.sim-panel-label {
+  display: block;
+  font-size: 11px;
+  color: #aaa;
+  margin-bottom: 6px;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+.sim-panel-btn-group {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.sim-panel-btn {
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: bold;
+  cursor: pointer;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: #888;
+  transition: all 0.2s;
+}
+.sim-panel-btn.active {
+  background: rgba(249, 115, 22, 0.15);
+  border: 1px solid rgba(249, 115, 22, 0.5);
+  color: #f97316;
+}
+.sim-panel-footer {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+}
+.sim-panel-cancel-btn {
+  flex: 1;
+  padding: 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #ccc;
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.sim-panel-start-btn {
+  flex: 2;
+  padding: 10px;
+  border-radius: 8px;
+  background: #f97316;
+  border: none;
+  color: #fff;
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}

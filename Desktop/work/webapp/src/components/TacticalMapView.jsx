@@ -4,405 +4,15 @@ import { distColor } from '../shared/helpers';
 import { TargetIcon, AlertIcon, LayersIcon, SignalIcon, PlayIcon, PauseIcon, RestartIcon, LoopIcon, CloseIcon, GamepadIcon } from '../shared/icons';
 import { Toolbar } from '../shared/ui';
 import { loadLeaflet, haversine, destPoint, buildDetectors, computeRadarBounds } from '../utils/mapUtils';
-import { getDronePosition } from '../utils/simulationEngine';
-
-import SimConfigPanel from './SimConfigPanel';
+import { makeDetectorIcon, makeDroneDotIcon, buildDronePopup, buildDetectorPopup } from './map/mapIcons';
+import SimConfigPanel from '../simulation/SimConfigPanel';
+import { getDronePosition } from '../simulation/engine';
+import { SweepLayer } from '../simulation/SweepLayer';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const GROUP_COLORS = { GA, GB };
 
-// ── Leaflet icon builders ─────────────────────────────────────────────────────
-function makeDetectorIcon(color) {
-  const id = color.replace('#', '');
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 36 36">
-    <defs><filter id="df${id}"><feDropShadow dx="0" dy="1" stdDeviation="3" flood-color="${color}" flood-opacity="0.5"/></filter></defs>
-    <circle cx="18" cy="18" r="14" fill="rgba(20,20,20,0.88)" stroke="${color}" stroke-width="2" filter="url(#df${id})"/>
-    <circle cx="18" cy="18" r="8" fill="none" stroke="${color}" stroke-width="1" opacity="0.5" stroke-dasharray="3 3"/>
-    <circle cx="18" cy="18" r="3" fill="${color}" opacity="0.95"/>
-    <circle cx="18" cy="18" r="1.5" fill="#fff" opacity="0.9"/>
-    <line x1="18" y1="4" x2="18" y2="9" stroke="${color}" stroke-width="1.8" stroke-linecap="round"/>
-    <line x1="18" y1="27" x2="18" y2="32" stroke="${color}" stroke-width="1.8" stroke-linecap="round"/>
-    <line x1="4" y1="18" x2="9" y2="18" stroke="${color}" stroke-width="1.8" stroke-linecap="round"/>
-    <line x1="27" y1="18" x2="32" y2="18" stroke="${color}" stroke-width="1.8" stroke-linecap="round"/>
-  </svg>`;
-  return window.L.divIcon({ html: `<div style="line-height:0">${svg}</div>`, iconSize: [36, 36], iconAnchor: [18, 18], popupAnchor: [0, -22], className: '' });
-}
-
-function makeDroneDotIcon(color, isAlert) {
-  const s = isAlert ? 22 : 18, t = s * 2;
-  const pulse = isAlert
-    ? `<circle cx="${s}" cy="${s}" r="${s - 2}" fill="${color}" opacity="0.18">
-         <animate attributeName="r" values="${s - 2};${s + 10};${s - 2}" dur="1.4s" repeatCount="indefinite"/>
-         <animate attributeName="opacity" values="0.18;0;0.18" dur="1.4s" repeatCount="indefinite"/>
-       </circle>`
-    : '';
-  const glow = `<circle cx="${s}" cy="${s}" r="${s - 3}" fill="none" stroke="${color}" stroke-width="1.5" opacity="0.35"/>`;
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${t}" height="${t}" viewBox="0 0 ${t} ${t}">
-    ${pulse}
-    ${glow}
-    <circle cx="${s}" cy="${s}" r="${s - 6}" fill="${color}" opacity="0.92" stroke="#111" stroke-width="2"/>
-    <circle cx="${s}" cy="${s}" r="${Math.round((s - 6) * 0.38)}" fill="#fff" opacity="0.75"/>
-  </svg>`;
-  return window.L.divIcon({ html: `<div style="line-height:0">${svg}</div>`, iconSize: [t, t], iconAnchor: [s, s], popupAnchor: [0, -s - 6], className: '' });
-}
-
-// ── Drone popup HTML ──────────────────────────────────────────────────────────
-function buildDronePopup(evt, color) {
-  const dist = evt.estimated_distance_m ?? null;
-  const dc = distColor(dist);
-  const crit = dist != null && dist < 100;
-  const dirLabel = evt.direction ?? '—';
-
-  // Premium row layout with inline SVG icon, label, and formatted value
-  const row = (label, val, iconSvg, vc = '#fff') => `
-    <div style="display:flex;align-items:center;gap:8px;padding:6px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.04);border-radius:6px">
-      <div style="display:flex;align-items:center;justify-content:center;width:18px;height:18px;background:rgba(255,255,255,0.04);border-radius:4px;color:#888;flex-shrink:0">
-        ${iconSvg}
-      </div>
-      <div style="display:flex;flex-direction:column;gap:1px;overflow:hidden">
-        <span style="color:#666;font-size:7.5px;text-transform:uppercase;letter-spacing:.06em;font-weight:600">${label}</span>
-        <span style="color:${vc};font-weight:700;font-size:10.5px;font-family:monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${val}</span>
-      </div>
-    </div>`;
-
-  // SVGs for rows
-  const idIcon = `<svg style="width:10px;height:10px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`;
-  const dirIcon = `<svg style="width:10px;height:10px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>`;
-  const protoIcon = `<svg style="width:10px;height:10px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`;
-  const freqIcon = `<svg style="width:10px;height:10px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M10.3 16.1a6 6 0 0 1 3.4 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>`;
-  const distIcon = `<svg style="width:10px;height:10px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>`;
-  const heightIcon = `<svg style="width:10px;height:10px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>`;
-  const clockIcon = `<svg style="width:10px;height:10px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`;
-
-  const threatColor = evt.threat === 'HIGH' ? '#f43f5e' : evt.threat === 'MEDIUM' ? '#fb923c' : '#34d399';
-
-  return `<div style="font-family:system-ui,-apple-system,sans-serif;font-size:11px;line-height:1.5;padding:4px 0;min-width:230px;color:#ddd">
-    <!-- Header -->
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;border-bottom:1px solid rgba(255,255,255,0.06);padding-bottom:6px">
-      <div style="display:flex;align-items:center;gap:6px">
-        <!-- Pulse dot -->
-        <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${color};box-shadow:0 0 6px ${color};animation:pulse 1.5s infinite"></span>
-        <div style="font-size:13px;font-weight:800;color:#fff;font-family:monospace">${evt.drone_id}</div>
-      </div>
-      <div style="display:flex;gap:4px">
-        <span style="font-size:8px;padding:2px 6px;border-radius:4px;font-weight:700;background:${threatColor}18;color:${threatColor};border:1px solid ${threatColor}30">${evt.threat} THREAT</span>
-        ${crit ? `<span style="display:inline-flex;align-items:center;gap:3px;font-size:8px;padding:2px 6px;border-radius:4px;font-weight:700;background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid rgba(239,68,68,0.35)">
-          <svg style="width:9px;height:9px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-          CRITICAL
-        </span>` : ''}
-      </div>
-    </div>
-    
-    <!-- Subtitle -->
-    <div style="color:#888;font-size:10px;margin-bottom:8px;display:flex;justify-content:space-between">
-      <span>${evt.model ?? 'Unknown Model'}</span>
-      <span style="font-weight:700;color:${color}">${evt.group}</span>
-    </div>
-    
-    <!-- Info Grid -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">
-      ${row('Drone ID', evt.drone_id, idIcon, color)}
-      ${row('Direction', dirLabel, dirIcon, '#60a5fa')}
-      ${row('Protocol', evt.protocol_name ?? 'Unknown', protoIcon, (evt.protocol_name === 'DIY/FPV' || evt.protocol_name === 'Unknown') ? '#f43f5e' : '#34d399')}
-      ${row('Frequency', evt.freq ? `${evt.freq} MHz` : '—', freqIcon, '#c084fc')}
-      ${row('Distance', `${dist ?? '—'} m`, distIcon, dc)}
-      ${row('Height', `${evt.height} m`, heightIcon, '#fb7185')}
-    </div>
-    
-    <!-- Footer -->
-    <div style="display:flex;align-items:center;gap:4px;color:#555;font-size:8.5px;font-family:monospace">
-      ${clockIcon}
-      <span>${evt.datetime?.replace('T', ' ').slice(0, 16) ?? ''}</span>
-    </div>
-  </div>`;
-}
-
-// ── Detector popup HTML ───────────────────────────────────────────────────────
-function buildDetectorPopup(det, color) {
-  const DIRS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
-  const dirCount = Object.fromEntries(DIRS.map(d => [d, 0]));
-  det.events.forEach(e => { if (e.direction && dirCount[e.direction] !== undefined) dirCount[e.direction]++; });
-  
-  const maxCount = Math.max(...Object.values(dirCount), 1);
-  
-  // Render directions as a clean, compact progress bar list
-  const dirRows = DIRS.filter(d => dirCount[d] > 0)
-    .map(d => {
-      const pct = (dirCount[d] / maxCount) * 100;
-      return `
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-          <span style="color:#aaa;font-size:9.5px;font-weight:700;width:22px;font-family:monospace">${d}</span>
-          <div style="flex:1;height:5px;background:rgba(255,255,255,0.05);border-radius:2.5px;overflow:hidden">
-            <div style="width:${pct}%;height:100%;background:${color};border-radius:2.5px;opacity:0.85"></div>
-          </div>
-          <span style="color:#fff;font-weight:700;font-size:9.5px;width:20px;text-align:right;font-family:monospace">${dirCount[d]}</span>
-        </div>`;
-    }).join('');
-
-  const radarIcon = `<svg style="width:12px;height:12px;color:${color}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M10.3 16.1a6 6 0 0 1 3.4 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>`;
-
-  return `<div style="font-family:system-ui,-apple-system,sans-serif;font-size:11px;min-width:210px;color:#ddd">
-    <!-- Header -->
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;border-bottom:1px solid rgba(255,255,255,0.06);padding-bottom:6px">
-      <div style="display:flex;align-items:center;gap:6px">
-        ${radarIcon}
-        <div style="font-size:13px;font-weight:800;color:#fff;font-family:monospace">${det.id}</div>
-      </div>
-      <!-- Status Badge -->
-      <span style="display:inline-flex;align-items:center;gap:3.5px;font-size:8px;padding:2px 6px;border-radius:4px;font-weight:700;background:rgba(52,211,153,0.12);color:#34d399;border:1px solid rgba(52,211,153,0.25)">
-        <span style="width:4.5px;height:4.5px;border-radius:50%;background:#34d399;display:inline-block;box-shadow:0 0 4px #34d399"></span>
-        ACTIVE
-      </span>
-    </div>
-    
-    <!-- Subtitle -->
-    <div style="color:#888;font-size:10px;margin-bottom:10px">${det.name ?? 'Operational Radar'}</div>
-    
-    <!-- Direction Stats -->
-    <div style="color:#666;font-size:7.5px;text-transform:uppercase;letter-spacing:.06em;font-weight:600;margin-bottom:6px">Detections by Direction</div>
-    <div style="margin-bottom:10px;background:rgba(255,255,255,0.01);border:1px solid rgba(255,255,255,0.03);border-radius:8px;padding:8px">
-      ${dirRows || '<div style="color:#555;font-size:9.5px;padding:4px 0">No directional events recorded</div>'}
-    </div>
-    
-    <!-- Summary Row -->
-    <div style="padding:8px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:8px;display:flex;align-items:center;justify-content:space-between">
-      <span style="color:#777;font-size:8px;text-transform:uppercase;letter-spacing:.05em;font-weight:600">Total Detections</span>
-      <span style="color:${color};font-weight:800;font-size:13px;font-family:monospace">${det.events.length}</span>
-    </div>
-  </div>`;
-}
-
-// ── Animated radar sweep (Canvas layer) — stays anchored to detector positions ──
-let globalSweepAngleDeg = 0;
-
-class SweepLayer {
-  constructor(detectors) {
-    // detectors: Array of { lat, lon, radiusM }
-    this._detectors = detectors; 
-    this._lastTime = null;
-    this._raf = null; this._canvas = null; this._map = null;
-    this._SPEED = 45;
-    this._onViewChange = this._onViewChange.bind(this);
-  }
-  onAdd(map) {
-    this._map = map;
-    this._canvas = document.createElement('canvas');
-    this._canvas.style.cssText = 'position:absolute;top:0;left:0;pointer-events:none;z-index:400;';
-    map.getPanes().overlayPane.appendChild(this._canvas);
-    map.on('move zoom viewreset resize moveend zoomend', this._onViewChange, this);
-    this._resize(); this._lastTime = performance.now();
-    this._raf = requestAnimationFrame(t => this._tick(t));
-  }
-  onRemove(map) {
-    cancelAnimationFrame(this._raf); this._raf = null;
-    if (this._canvas?.parentNode) this._canvas.parentNode.removeChild(this._canvas);
-    map.off('move zoom viewreset resize moveend zoomend', this._onViewChange, this);
-    this._canvas = null; this._map = null;
-  }
-  _onViewChange() {
-    this._resize();
-  }
-  _resize() {
-    if (!this._map || !this._canvas) return;
-    const s = this._map.getSize();
-    this._canvas.width = s.x; this._canvas.height = s.y;
-    const origin = this._map.containerPointToLayerPoint([0, 0]);
-    window.L.DomUtil.setPosition(this._canvas, origin);
-  }
-  _tick(now) {
-    if (!this._map || !this._canvas) return;
-    const dt = Math.min((now - this._lastTime) / 1000, 0.1);
-    this._lastTime = now; globalSweepAngleDeg = (globalSweepAngleDeg + this._SPEED * dt) % 360;
-    this._draw(); this._raf = requestAnimationFrame(t => this._tick(t));
-  }
-  _draw() {
-    if (!this._map || !this._canvas) return;
-    const cv = this._canvas, ctx = cv.getContext('2d');
-    const s = this._map.getSize(); ctx.clearRect(0, 0, s.x, s.y);
-    
-    this._detectors.forEach(det => {
-      const cp = this._map.latLngToContainerPoint([det.lat, det.lon]);
-      const ep = this._map.latLngToContainerPoint([det.lat + det.radiusM / 111320, det.lon]);
-      const rPx = Math.abs(cp.y - ep.y);
-      const sweepRad = (globalSweepAngleDeg - 90) * Math.PI / 180, fanRad = 80 * Math.PI / 180;
-      ctx.save();
-      const grd = ctx.createRadialGradient(cp.x, cp.y, 0, cp.x, cp.y, rPx);
-      grd.addColorStop(0, 'rgba(34,197,94,0.0)'); grd.addColorStop(0.15, 'rgba(34,197,94,0.10)');
-      grd.addColorStop(0.65, 'rgba(34,197,94,0.06)'); grd.addColorStop(1.0, 'rgba(34,197,94,0.0)');
-      ctx.beginPath(); ctx.moveTo(cp.x, cp.y);
-      ctx.arc(cp.x, cp.y, rPx, sweepRad - fanRad, sweepRad, false); ctx.closePath();
-      ctx.fillStyle = grd; ctx.fill();
-      ctx.beginPath(); ctx.moveTo(cp.x, cp.y);
-      ctx.lineTo(cp.x + rPx * Math.cos(sweepRad), cp.y + rPx * Math.sin(sweepRad));
-      ctx.strokeStyle = 'rgba(34,197,94,0.75)'; ctx.lineWidth = 2;
-      ctx.shadowBlur = 8; ctx.shadowColor = 'rgba(34,197,94,0.7)'; ctx.stroke();
-      ctx.restore();
-    });
-  }
-}
-
-// ── Per-detector radar overlay ────────────────────────────────────────────────
-function drawDetectorRadar(map, L, det) {
-  const { lat, lon } = det;
-  const events = det.events;
-  const layers = [];
-  const DIRS = [
-    { label: 'N', deg: 0 }, { label: 'NE', deg: 45 }, { label: 'E', deg: 90 }, { label: 'SE', deg: 135 },
-    { label: 'S', deg: 180 }, { label: 'SW', deg: 225 }, { label: 'W', deg: 270 }, { label: 'NW', deg: 315 }
-  ];
-  const dirCount = Object.fromEntries(DIRS.map(d => [d.label, 0]));
-  events.forEach(e => { if (e.direction && dirCount[e.direction] !== undefined) dirCount[e.direction]++; });
-
-  const maxDist = Math.max(...events.map(e => e.estimated_distance_m ?? 800), 800);
-  const radiusM = Math.min(maxDist * 1.3 + 200, 2000);
-
-  // Zone rings
-  [
-    { frac: .20, fill: '#ef4444', fOp: .06, stroke: '#ef4444', sOp: .60, w: 1.5 },
-    { frac: .40, fill: '#f97316', fOp: .04, stroke: '#f97316', sOp: .40, w: 1.2, dash: '6 4' },
-    { frac: .60, fill: '#eab308', fOp: .03, stroke: '#eab308', sOp: .35, w: 1, dash: '6 4' },
-    { frac: .80, fill: '#22c55e', fOp: .02, stroke: '#22c55e', sOp: .25, w: 1, dash: '8 6' },
-    { frac: 1.0, fill: '#3b82f6', fOp: .01, stroke: '#3b82f6', sOp: .55, w: 2 }
-  ].forEach(z => {
-    layers.push(L.circle([lat, lon], { radius: radiusM * z.frac, color: z.stroke, weight: z.w, opacity: z.sOp, fillColor: z.fill, fillOpacity: z.fOp, dashArray: z.dash, interactive: false }).addTo(map));
-  });
-
-  // Threat sectors
-  DIRS.forEach(({ label, deg }) => {
-    const count = dirCount[label]; if (!count) return;
-    const startR = (deg - 22.5) * Math.PI / 180, endR = (deg + 22.5) * Math.PI / 180;
-    const dirEvts = events.filter(e => e.direction === label);
-    const minDist = Math.min(...dirEvts.map(e => e.estimated_distance_m ?? 999));
-    const arcColor = distColor(minDist), intensity = Math.min(.10 + count * .05, .38);
-    const pts = [];
-    for (let i = 0; i <= 14; i++) {
-      const a = startR + (endR - startR) * (i / 14);
-      const dlat = (radiusM * .9 * Math.cos(a)) / 111320;
-      const dlon = (radiusM * .9 * Math.sin(a)) / (111320 * Math.cos(lat * Math.PI / 180));
-      pts.push([lat + dlat, lon + dlon]);
-    }
-    pts.push([lat, lon]);
-    layers.push(L.polygon(pts, { color: arcColor, weight: 1.2, opacity: .6, fillColor: arcColor, fillOpacity: intensity, interactive: false }).addTo(map));
-  });
-
-  // Spoke lines + direction labels
-  DIRS.forEach(({ label, deg }) => {
-    const count = dirCount[label], rad = deg * Math.PI / 180;
-    const dlat = (radiusM * Math.cos(rad)) / 111320;
-    const dlon = (radiusM * Math.sin(rad)) / (111320 * Math.cos(lat * Math.PI / 180));
-    layers.push(L.polyline([[lat, lon], [lat + dlat, lon + dlon]], {
-      color: count > 0 ? '#60a5fa' : '#94a3b840', weight: count > 0 ? 1.5 : .7,
-      opacity: count > 0 ? .28 : .12, dashArray: '3 9', interactive: false
-    }).addTo(map));
-    const lf = 1.11;
-    const llat = lat + (radiusM * lf * Math.cos(rad)) / 111320;
-    const llon = lon + (radiusM * lf * Math.sin(rad)) / (111320 * Math.cos(lat * Math.PI / 180));
-    const lc = count > 0 ? '#ea580c' : '#94a3b8aa';
-    layers.push(L.marker([llat, llon], {
-      icon: L.divIcon({
-        html: `<div style="font-family:monospace;font-size:10px;font-weight:800;color:${lc};white-space:nowrap;${count > 0 ? `background:rgba(234,88,12,0.1);border:1px solid rgba(234,88,12,0.3);border-radius:5px;padding:1px 5px;` : ''}">${label}${count > 0 ? ` <span style="color:#ef4444">${count}</span>` : ''}</div>`,
-        iconSize: [52, 20], iconAnchor: [26, 10], className: ''
-      }), interactive: false
-    }).addTo(map));
-  });
-
-  // Center label for this detector
-  const color = GROUP_COLORS[det.group] ?? '#f97316';
-  layers.push(L.marker([lat, lon], {
-    icon: L.divIcon({
-      html: `<div style="font-family:monospace;font-size:9px;font-weight:700;color:${color};background:rgba(14,14,14,0.85);border:1px solid ${color}55;border-radius:6px;padding:2px 6px;white-space:nowrap;margin-top:22px">${det.id} · ${events.length} det.</div>`,
-      iconSize: [120, 20], iconAnchor: [60, 0], className: ''
-    }), interactive: false, zIndexOffset: 1000
-  }).addTo(map));
-
-  return layers;
-}
-
-// ── Global overview radar ─────────────────────────────────────────────────────
-function drawGlobalRadar(map, L, center, radiusM, events) {
-  const { lat, lon } = center;
-  const layers = [];
-  const DIRS = [
-    { label: 'N', deg: 0 }, { label: 'NE', deg: 45 }, { label: 'E', deg: 90 }, { label: 'SE', deg: 135 },
-    { label: 'S', deg: 180 }, { label: 'SW', deg: 225 }, { label: 'W', deg: 270 }, { label: 'NW', deg: 315 }
-  ];
-  const dirCount = Object.fromEntries(DIRS.map(d => [d.label, 0]));
-  events.forEach(e => { if (e.direction && dirCount[e.direction] !== undefined) dirCount[e.direction]++; });
-
-  // Zone rings
-  [
-    { frac: .20, fill: '#ef4444', fOp: .06, stroke: '#ef4444', sOp: .60, w: 1.5 },
-    { frac: .40, fill: '#f97316', fOp: .04, stroke: '#f97316', sOp: .40, w: 1.2, dash: '6 4' },
-    { frac: .60, fill: '#eab308', fOp: .03, stroke: '#eab308', sOp: .35, w: 1, dash: '6 4' },
-    { frac: .80, fill: '#22c55e', fOp: .02, stroke: '#22c55e', sOp: .25, w: 1, dash: '8 6' },
-    { frac: 1.0, fill: '#3b82f6', fOp: .01, stroke: '#3b82f6', sOp: .55, w: 2 }
-  ].forEach(z => {
-    layers.push(L.circle([lat, lon], { radius: radiusM * z.frac, color: z.stroke, weight: z.w, opacity: z.sOp, fillColor: z.fill, fillOpacity: z.fOp, dashArray: z.dash, interactive: false }).addTo(map));
-  });
-
-  // Threat sectors
-  DIRS.forEach(({ label, deg }) => {
-    const count = dirCount[label]; if (!count) return;
-    const startR = (deg - 22.5) * Math.PI / 180, endR = (deg + 22.5) * Math.PI / 180;
-    const dirEvts = events.filter(e => e.direction === label);
-    const minDist = Math.min(...dirEvts.map(e => e.estimated_distance_m ?? 999));
-    const arcColor = distColor(minDist), intensity = Math.min(.10 + count * .05, .38);
-    const pts = [];
-    for (let i = 0; i <= 14; i++) {
-      const a = startR + (endR - startR) * (i / 14);
-      const dlat = (radiusM * .9 * Math.cos(a)) / 111320;
-      const dlon = (radiusM * .9 * Math.sin(a)) / (111320 * Math.cos(lat * Math.PI / 180));
-      pts.push([lat + dlat, lon + dlon]);
-    }
-    pts.push([lat, lon]);
-    layers.push(L.polygon(pts, { color: arcColor, weight: 1.2, opacity: .6, fillColor: arcColor, fillOpacity: intensity, interactive: false }).addTo(map));
-  });
-
-  // Spoke lines + direction labels
-  DIRS.forEach(({ label, deg }) => {
-    const count = dirCount[label], rad = deg * Math.PI / 180;
-    const dlat = (radiusM * Math.cos(rad)) / 111320;
-    const dlon = (radiusM * Math.sin(rad)) / (111320 * Math.cos(lat * Math.PI / 180));
-    layers.push(L.polyline([[lat, lon], [lat + dlat, lon + dlon]], {
-      color: count > 0 ? '#60a5fa' : '#94a3b840', weight: count > 0 ? 1.5 : .7,
-      opacity: count > 0 ? .28 : .12, dashArray: '3 9', interactive: false
-    }).addTo(map));
-    const lf = 1.11;
-    const llat = lat + (radiusM * lf * Math.cos(rad)) / 111320;
-    const llon = lon + (radiusM * lf * Math.sin(rad)) / (111320 * Math.cos(lat * Math.PI / 180));
-    const lc = count > 0 ? '#ea580c' : '#94a3b8aa';
-    layers.push(L.marker([llat, llon], {
-      icon: L.divIcon({
-        html: `<div style="font-family:monospace;font-size:11px;font-weight:800;color:${lc};white-space:nowrap;${count > 0 ? `background:rgba(234,88,12,0.1);border:1px solid rgba(234,88,12,0.3);border-radius:5px;padding:1px 6px;` : ''}">${label}${count > 0 ? ` <span style="color:#ef4444">${count}</span>` : ''}</div>`,
-        iconSize: [52, 20], iconAnchor: [26, 10], className: ''
-      }), interactive: false
-    }).addTo(map));
-  });
-
-  // Zone range labels
-  [
-    { frac: .20, label: 'CRITICAL', color: '#ef4444' }, { frac: .40, label: 'DANGER', color: '#f97316' },
-    { frac: .60, label: 'WARNING', color: '#eab308' }, { frac: .80, label: 'CAUTION', color: '#22c55e' }
-  ].forEach(({ frac, label, color }) => {
-    const rM = radiusM * frac, dlon = rM / (111320 * Math.cos(lat * Math.PI / 180));
-    layers.push(L.marker([lat, lon + dlon], {
-      icon: L.divIcon({
-        html: `<div style="font-family:monospace;font-size:8px;font-weight:700;color:${color};background:rgba(20,20,20,.80);border:1px solid ${color}55;border-radius:3px;padding:1px 5px;white-space:nowrap;">${label}</div>`,
-        iconSize: [70, 14], iconAnchor: [0, 7], className: ''
-      }), interactive: false
-    }).addTo(map));
-  });
-
-  // Center crosshair
-  layers.push(L.marker([lat, lon], {
-    icon: L.divIcon({
-      html: `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28"><circle cx="14" cy="14" r="12" fill="rgba(20,20,20,0.7)" stroke="#ea580c" stroke-width="1.5" opacity="0.9"/><circle cx="14" cy="14" r="5" fill="#ea580c" opacity="0.95"/><circle cx="14" cy="14" r="2" fill="#fff"/><line x1="14" y1="2" x2="14" y2="8" stroke="#ea580c" stroke-width="1.5" stroke-linecap="round"/><line x1="14" y1="20" x2="14" y2="26" stroke="#ea580c" stroke-width="1.5" stroke-linecap="round"/><line x1="2" y1="14" x2="8" y2="14" stroke="#ea580c" stroke-width="1.5" stroke-linecap="round"/><line x1="20" y1="14" x2="26" y2="14" stroke="#ea580c" stroke-width="1.5" stroke-linecap="round"/></svg>`,
-      iconSize: [28, 28], iconAnchor: [14, 14], className: ''
-    }), interactive: false, zIndexOffset: 2000
-  }).addTo(map));
-
-  return layers;
-}
+import { drawDetectorRadar, drawGlobalRadar } from './map/radarDrawers';
 
 // ── Leaflet CSS overrides ─────────────────────────────────────────────────────
 const MAP_CSS = `
@@ -468,10 +78,13 @@ const MAP_CSS = `
   0% { opacity: 0.75; transform: scale(0.95); }
   50% { opacity: 1; transform: scale(1.1); }
   100% { opacity: 0.75; transform: scale(0.95); }
+}
+.leaflet-marker-icon.tac-smooth {
+  transition: transform 1.2s linear !important;
 }`;
 
 // ── Main component ─────────────────────────────────────────────────────────────
-export default function TacticalMapView({ events, isLoading, simContext }) {
+export default function TacticalMapView({ events, summary, isLoading, simContext }) {
   const [showSweep,   setShowSweep]   = useState(true);
   const [radarMode,   setRadarMode]   = useState('none');
 
@@ -483,6 +96,8 @@ export default function TacticalMapView({ events, isLoading, simContext }) {
   const simDroneRefs  = useRef({}); // For live simulation markers
   const simTrailRefs  = useRef({}); // For live simulation trails
   const simLineRefs   = useRef({}); // For live simulation detection lines
+  const liveDroneRefs = useRef({}); // For real live/mock api markers
+  const liveTrailRefs = useRef({}); // For real live/mock api trails
 
   const filtered   = events;
   const detectors  = useMemo(() => {
@@ -492,7 +107,6 @@ export default function TacticalMapView({ events, isLoading, simContext }) {
     return buildDetectors(filtered);
   }, [filtered, simContext?.simMode, simContext?.detectors]);
   const radarBound = useMemo(() => computeRadarBounds(detectors), [detectors]);
-  const alertCount = filtered.filter(e => (e.estimated_distance_m ?? 999) < 100).length;
 
   // Auto-show global radar in simulation mode
   useEffect(() => {
@@ -508,7 +122,7 @@ export default function TacticalMapView({ events, isLoading, simContext }) {
     simContext.liveDrones.forEach(drone => {
       detectors.forEach(det => {
         const dist = haversine(drone.latitude, drone.longitude, det.lat, det.lon);
-        const detRadius = Math.min(Math.max(...(det.events?.map(e => e.estimated_distance_m ?? 800) || [800]), 800) * 1.3 + 200, 2000);
+        const detRadius = Math.min(Math.max(...(det.events?.map(e => e.estimated_distance_m ?? 800) || [800]), 800) * 1.3 + 200, 5000);
         if (dist < detRadius) {
           detections.push({ 
             droneId: drone.drone_id, 
@@ -522,6 +136,41 @@ export default function TacticalMapView({ events, isLoading, simContext }) {
     });
     return detections.sort((a, b) => a.dist - b.dist);
   }, [simContext?.simMode, simContext?.liveDrones, detectors]);
+
+  // Compute stats for visible targets
+  const visibleStats = useMemo(() => {
+    let visibleCount = 0, critCount = 0, gaCount = 0, gbCount = 0;
+    
+    if (simContext?.simMode) {
+      const uniqueSimDrones = Array.from(new Set(liveDetections.map(d => d.droneId)));
+      visibleCount = uniqueSimDrones.length;
+      critCount = liveDetections.filter(d => d.dist < 100).length;
+      gaCount = liveDetections.filter(d => d.droneGroup === 'GA').length;
+      gbCount = liveDetections.filter(d => d.droneGroup === 'GB').length;
+    } else {
+      // Events are already strictly filtered by useEvents.js (Option A)
+      const droneMap = {};
+      filtered.forEach(evt => {
+        const id = evt.drone_id || 'unknown';
+        if (!droneMap[id]) droneMap[id] = [];
+        droneMap[id].push(evt);
+      });
+      
+      const visibleEvts = Object.values(droneMap).map(evts => {
+        evts.sort((a, b) => new Date(a.datetime) - new Date(b.datetime));
+        return evts[evts.length - 1];
+      });
+      
+      visibleCount = visibleEvts.length;
+      critCount = visibleEvts.filter(e => (e.estimated_distance_m ?? 999) < 100).length;
+      gaCount = visibleEvts.filter(e => e.group === 'GA').length;
+      gbCount = visibleEvts.filter(e => e.group === 'GB').length;
+    }
+
+    const noGpsCount = summary?.no_gps || 0;
+
+    return { visibleCount, critCount, gaCount, gbCount, noGpsCount };
+  }, [simContext?.simMode, liveDetections, filtered, summary]);
 
   // Init map once
   useEffect(() => {
@@ -597,21 +246,71 @@ export default function TacticalMapView({ events, isLoading, simContext }) {
       overlayRefs.current.push(mk);
     });
 
-    // ── Drone dots ──
+    // ── Drone dots & trails (Realistic Live/Mock) ──
     if (!simContext?.simMode) {
-      filtered.forEach(evt => {
-        if (!evt.latitude || !evt.longitude) return;
-        const dist  = evt.estimated_distance_m ?? null;
-        const gc    = GROUP_COLORS[evt.group] ?? '#888';
-        const isAlert = dist != null && dist < 100;
-
-        const mk = L.marker([evt.latitude, evt.longitude], { icon: makeDroneDotIcon(gc, isAlert), zIndexOffset: isAlert ? 300 : 100 })
-          .bindPopup(
-            L.popup({ maxWidth: 260, closeButton: true, className: 'tac-popup' }).setContent(buildDronePopup(evt, gc))
-          )
-          .addTo(map);
-        overlayRefs.current.push(mk);
+      // Group by drone
+      const droneMap = {};
+      
+      // Calculate each detector's sweep radius
+      const detRadii = {};
+      detectors.forEach(det => {
+        const maxDist = Math.max(...(det.events?.map(e => e.estimated_distance_m ?? 800) || [800]), 800);
+        detRadii[det.id] = Math.min(maxDist * 1.3 + 200, 2000);
       });
+
+      filtered.forEach(evt => {
+        const id = evt.drone_id || 'unknown';
+        if (!droneMap[id]) droneMap[id] = [];
+        droneMap[id].push(evt);
+      });
+
+      const currentLiveIds = new Set(Object.keys(droneMap));
+
+      // Update or create markers/trails
+      Object.entries(droneMap).forEach(([id, evts]) => {
+        evts.sort((a, b) => new Date(a.datetime) - new Date(b.datetime));
+        const latest = evts[evts.length - 1];
+        const dist  = latest.estimated_distance_m ?? null;
+        const gc    = GROUP_COLORS[latest.group] ?? '#888';
+        const isAlert = dist != null && dist < 100;
+        
+        const pathCoords = evts.map(e => [e.latitude, e.longitude]);
+
+        if (!liveDroneRefs.current[id]) {
+          // Create new
+          const trail = L.polyline(pathCoords, { color: gc, weight: 2, opacity: 0.35, dashArray: '4 6' }).addTo(map);
+          liveTrailRefs.current[id] = trail;
+
+          const mk = L.marker([latest.latitude, latest.longitude], { icon: makeDroneDotIcon(gc, isAlert), zIndexOffset: isAlert ? 300 : 100 })
+            .bindPopup(L.popup({ maxWidth: 260, closeButton: true, className: 'tac-popup' }).setContent(buildDronePopup(latest, gc)))
+            .addTo(map);
+          liveDroneRefs.current[id] = mk;
+        } else {
+          // Update existing
+          liveTrailRefs.current[id].setLatLngs(pathCoords);
+          liveDroneRefs.current[id].setLatLng([latest.latitude, latest.longitude]);
+          liveDroneRefs.current[id].setIcon(makeDroneDotIcon(gc, isAlert));
+          if (liveDroneRefs.current[id].isPopupOpen()) {
+            liveDroneRefs.current[id].setPopupContent(buildDronePopup(latest, gc));
+          }
+        }
+      });
+
+      // Cleanup removed drones
+      Object.keys(liveDroneRefs.current).forEach(id => {
+        if (!currentLiveIds.has(id)) {
+          liveDroneRefs.current[id].remove();
+          delete liveDroneRefs.current[id];
+          liveTrailRefs.current[id].remove();
+          delete liveTrailRefs.current[id];
+        }
+      });
+    } else {
+      // Clear live artifacts if switching to simMode
+      Object.values(liveDroneRefs.current).forEach(m => m.remove());
+      Object.values(liveTrailRefs.current).forEach(t => t.remove());
+      liveDroneRefs.current = {};
+      liveTrailRefs.current = {};
     }
 
     if (!simContext?.simMode && filtered.length > 0) {
@@ -770,15 +469,15 @@ export default function TacticalMapView({ events, isLoading, simContext }) {
   }, [simContext?.subscribeTick, simContext?.simMode, leafletMap.current]);
 
   return (
-    <div className="flex-col-start h-full" style={{ background: '#0a0a0a' }}>
+    <div className="tm-container flex-col-start h-full">
       <style>{MAP_CSS}</style>
 
       <Toolbar>
         <div className="flex-row-center gap-2">
-          <TargetIcon style={{ width: '1rem', height: '1rem', color: '#f97316' }} />
-          <span style={{ fontSize: '14px', fontWeight: 'bold', color: '#fff' }}>Tactical Map</span>
-          <span className="rounded-full font-bold" style={{ fontSize: '11px', padding: '2px 10px', background: 'rgba(249,115,22,.12)', color: '#f97316', border: '1px solid rgba(249,115,22,.35)' }}>{filtered.length} targets</span>
-          {alertCount > 0 && <span className="rounded-full font-bold animate-pulse" style={{ fontSize: '11px', padding: '2px 10px', background: 'rgba(239,68,68,.12)', color: '#ef4444', border: '1px solid rgba(239,68,68,.4)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}><AlertIcon className="w-3 h-3" stroke="#ef4444" /> {alertCount} CRITICAL</span>}
+          <TargetIcon className="tm-icon-orange" />
+          <span className="tm-title">Tactical Map</span>
+          <span className="tm-badge-orange rounded-full font-bold">{visibleStats.visibleCount} targets</span>
+          {visibleStats.critCount > 0 && <span className="tm-badge-red rounded-full font-bold animate-pulse"><AlertIcon className="w-3 h-3" stroke="#ef4444" /> {visibleStats.critCount} CRITICAL</span>}
         </div>
 
         {/* Layer toggles */}
@@ -787,7 +486,7 @@ export default function TacticalMapView({ events, isLoading, simContext }) {
           {radarMode !== 'global' && (
             <button onClick={() => setShowSweep(v => !v)}
               className="rounded-full font-bold transition-all"
-              style={{ fontSize: '10px', padding: '6px 12px', background: showSweep ? '#22c55e18' : '#1a1a1a', border: '1px solid ' + (showSweep ? '#22c55e' : '#2a2a2a'), color: showSweep ? '#22c55e' : '#555', cursor: 'pointer' }}>
+              className={showSweep ? 'tm-btn-sweep-active rounded font-bold' : 'tm-btn-sweep-inactive rounded font-bold'}>
               Sweep
             </button>
           )}
@@ -803,7 +502,7 @@ export default function TacticalMapView({ events, isLoading, simContext }) {
               color: radarMode === 'global' ? '#3b82f6' : '#555',
               cursor: 'pointer'
             }}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}><LayersIcon className="w-3 h-3" stroke={radarMode === 'global' ? '#3b82f6' : '#555'} /> All Radars</span>
+            <span className="tm-icon-text"><LayersIcon className="w-3 h-3" stroke={radarMode === 'global' ? '#3b82f6' : '#555'} /> All Radars</span>
           </button>
         </div>
 
@@ -832,7 +531,7 @@ export default function TacticalMapView({ events, isLoading, simContext }) {
           />
         )}
 
-        <div ref={mapRef} style={{ width: '100%', height: '100%' }} />
+        <div ref={mapRef} className="tm-map-container" />
 
         {/* Simulation Control Toolbar (Compact Pill Design) */}
         {simContext?.simMode && (
@@ -911,44 +610,44 @@ export default function TacticalMapView({ events, isLoading, simContext }) {
         )}
 
         {/* Legend */}
-        <div className="legend-box" style={{ background: 'rgba(14,14,14,0.92)', border: '1px solid #2a2a2a', backdropFilter: 'blur(8px)' }}>
-          <span style={{ fontSize: 9, color: '#555', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 'bold', marginBottom: 2 }}>Radar Zones</span>
+        <div className="legend-box tm-legend-overlay">
+          <span className="tm-legend-title">Radar Zones</span>
           {[['CRITICAL', '#ef4444', '< 20%'], ['DANGER', '#f97316', '< 40%'], ['WARNING', '#eab308', '< 60%'], ['CAUTION', '#22c55e', '< 80%'], ['BOUNDARY', '#3b82f6', 'outer']].map(([l, c, h]) => (
             <div key={l} className="flex-row-center gap-2-5">
-              <div className="rounded" style={{ background: c, opacity: .75, width: 12, height: 12 }} />
-              <span className="font-mono" style={{ fontSize: 10, fontWeight: 'bold', color: c }}>{l}</span>
-              <span style={{ fontSize: 9, color: '#444', marginLeft: 'auto' }}>{h}</span>
+              <div className="rounded tm-legend-color-box" style={{ background: c }} />
+              <span className="font-mono tm-legend-label" style={{ color: c }}>{l}</span>
+              <span className="tm-legend-val font-mono">{h}</span>
             </div>
           ))}
-          <div className="flex-col-start gap-1-5" style={{ borderTop: '1px solid #2a2a2a', paddingTop: 8, marginTop: 4 }}>
+          <div className="flex-col-start gap-1-5 tm-legend-divider">
             {[['#ef4444', 'Critical drone (< 100m)'], ['#22c55e', 'Safe drone'], ['#f97316', 'Detector']].map(([c, l]) => (
               <div key={l} className="flex-row-center gap-2">
-                <div className="rounded-full" style={{ background: c, opacity: .85, width: 10, height: 10 }} />
-                <span style={{ fontSize: 9, color: '#555' }}>{l}</span>
+                <div className="rounded-full tm-legend-dot" style={{ background: c }} />
+                <span className="tm-legend-dot-label">{l}</span>
               </div>
             ))}
           </div>
-          <div style={{ borderTop: '1px solid #2a2a2a', paddingTop: 8, marginTop: 4 }}>
-            <div style={{ fontSize: 9, color: '#444' }}>Click detector → show its radar</div>
-            <div style={{ fontSize: 9, color: '#444' }}>Click drone dot → details</div>
+          <div className="tm-legend-divider">
+            <div className="tm-legend-hint">Click detector → show its radar</div>
+            <div className="tm-legend-hint">Click drone dot → details</div>
           </div>
         </div>
 
         {/* Live stats overlay */}
         {filtered.length > 0 && (
-          <div className="stats-overlay-box" style={{ background: 'rgba(14,14,14,0.92)', border: '1px solid #2a2a2a', backdropFilter: 'blur(8px)', minWidth: '150px' }}>
-            {[['Targets', filtered.length, '#f97316'], ['Detectors', detectors.length, '#3b82f6'], ['Critical', alertCount, '#ef4444'],
-              ['No GPS', filtered.filter(e => !e.has_gps).length, '#eab308'],
-              ['GA', filtered.filter(e => e.group === 'GA').length, '#f97316'],
-              ['GB', filtered.filter(e => e.group === 'GB').length, '#eab308']].map(([l, v, c]) => (
+          <div className="stats-overlay-box tm-stats-overlay">
+            {[['Targets', visibleStats.visibleCount, '#f97316'], ['Detectors', detectors.length, '#3b82f6'], ['Critical', visibleStats.critCount, '#ef4444'],
+              ['No GPS', visibleStats.noGpsCount, '#eab308'],
+              ['GA', visibleStats.gaCount, '#f97316'],
+              ['GB', visibleStats.gbCount, '#eab308']].map(([l, v, c]) => (
               <div key={l} className="flex-row-between gap-4">
-                <span style={{ fontSize: 11, color: '#555' }}>{l}</span>
-                <span className="font-mono" style={{ fontSize: 13, fontWeight: 'bold', color: c }}>{v}</span>
+                <span className="tm-stats-label">{l}</span>
+                <span className="font-mono tm-stats-val" style={{ color: c }}>{v}</span>
               </div>
             ))}
             {radarMode !== 'none' && (
-              <div style={{ borderTop: '1px solid #222', paddingTop: 6, marginTop: 2 }}>
-                <div className="font-mono" style={{ fontSize: 9, fontWeight: 'bold', color: radarMode === 'global' ? '#3b82f6' : '#f97316', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <div className="tm-stats-divider">
+                <div className="font-mono tm-stats-flex" style={{ color: radarMode === 'global' ? '#3b82f6' : '#f97316' }}>
                   {radarMode === 'global' ? (
                     <><LayersIcon className="w-3 h-3" stroke="#3b82f6" /> Global overview</>
                   ) : (
@@ -960,28 +659,28 @@ export default function TacticalMapView({ events, isLoading, simContext }) {
             
             {/* Live Detections Panel */}
             {simContext?.simMode && (
-              <div style={{ borderTop: '1px solid #222', paddingTop: 8, marginTop: 8 }}>
-                <div style={{ fontSize: 10, color: '#888', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 'bold', marginBottom: 6, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <span className="animate-pulse" style={{ width: 6, height: 6, background: '#ef4444', borderRadius: '50%' }}></span>
+              <div className="tm-active-det-divider">
+                <div className="tm-active-det-title">
+                  <span className="animate-pulse tm-pulse-dot"></span>
                   Live Tracking
                 </div>
                 {liveDetections.length > 0 ? (
-                  <div className="flex-col-start gap-2 max-h-[200px] overflow-y-auto custom-scrollbar pr-1" style={{ pointerEvents: 'auto' }}>
+                  <div className="flex-col-start gap-2 max-h-[200px] overflow-y-auto custom-scrollbar pr-1 tm-scroll-container">
                     {liveDetections.map((d, i) => (
-                      <div key={i} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 6, padding: '4px 6px' }}>
+                      <div key={i} className="flex-row-between tm-det-card">
                         <div className="flex-row-between">
-                          <span style={{ fontSize: 11, fontWeight: 'bold', color: d.droneColor, fontFamily: 'monospace' }}>{d.droneId}</span>
-                          <span style={{ fontSize: 10, color: '#aaa', fontFamily: 'monospace' }}>{d.dist}m</span>
+                          <span className="tm-det-drone-id" style={{ color: d.droneColor }}>{d.droneId}</span>
+                          <span className="tm-det-dist">{d.dist}m</span>
                         </div>
                         <div className="flex-row-between mt-1">
-                          <span style={{ fontSize: 9, color: '#777' }}>Detected by</span>
-                          <span style={{ fontSize: 9, fontWeight: 'bold', color: '#f87171' }}>{d.detId}</span>
+                          <span className="tm-det-label">Detected by</span>
+                          <span className="tm-det-id">{d.detId}</span>
                         </div>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div style={{ fontSize: 10, color: '#555', fontStyle: 'italic', padding: '4px 0' }}>No active detections</div>
+                  <div className="tm-det-empty">No active detections</div>
                 )}
               </div>
             )}

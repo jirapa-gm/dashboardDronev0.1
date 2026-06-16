@@ -1,7 +1,9 @@
+import './DroneTables.css';
 import { useState, useMemo } from 'react';
 import { THREAT_COLOR, GA, GB } from '../shared/constants';
 import { dirLabel, formatDate } from '../shared/helpers';
-import { SignalSparkline, DetectionTimeline } from './Charts';
+import { SignalSparkline } from "./charts/SignalSparkline";
+import { DetectionTimeline } from "./charts/DetectionTimeline";
 
 export default function DroneHistoryPanel({ droneId, allEvents, onClose }) {
   const detections = useMemo(() => {
@@ -75,7 +77,7 @@ export default function DroneHistoryPanel({ droneId, allEvents, onClose }) {
         {icon && (
           <div className="drone-stat-icon-wrapper" dangerouslySetInnerHTML={{ __html: icon }} />
         )}
-        <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
+        <div className="dh-stat-col">
           <div className="drone-stat-label">{label}</div>
           <div className="drone-stat-value" style={{
             fontFamily: typeof value === 'number' || (typeof value === 'string' && /\d/.test(value)) ? 'monospace' : 'system-ui, -apple-system, sans-serif',
@@ -87,26 +89,26 @@ export default function DroneHistoryPanel({ droneId, allEvents, onClose }) {
   };
 
   const Divider = ({ label }) => (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '8px 0 4px 0' }}>
-      <span style={{ fontSize: 8.5, color: '#f97316', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 800, fontFamily: 'system-ui, -apple-system, sans-serif' }}>{label}</span>
-      <div style={{ flex: 1, height: 1, background: 'linear-gradient(to right, rgba(249, 115, 22, 0.12), transparent)' }} />
+    <div className="dh-header-row">
+      <span className="dh-header-label">{label}</span>
+      <div className="dh-header-line" />
     </div>
   );
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div onClick={e => e.stopPropagation()} className="drone-modal-content" style={{ maxWidth: '95vw' }}>
+      <div onClick={e => e.stopPropagation()} className="drone-modal-content" className="drone-modal-content dh-modal-content">
 
         {/* ── Header ── */}
         <div style={{ background:'rgba(25, 25, 25, 0.6)', borderBottom:'1px solid rgba(255, 255, 255, 0.06)', padding:'10px 16px',
                       display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0, borderRadius:'16px 16px 0 0' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', color: gc }}>
+          <div className="dh-modal-title-row">
+            <div className="dh-modal-icon-box" style={{ color: gc }}>
               <div dangerouslySetInnerHTML={{ __html: icons.drone }} />
             </div>
             <div>
-              <div style={{ display:'flex', alignItems:'center', gap:9, marginBottom:3 }}>
-                <span style={{ fontSize:18, fontWeight:800, fontFamily:'monospace', letterSpacing:'0.02em', color: '#fff' }}>{droneId}</span>
+              <div className="dh-modal-id-row">
+                <span className="dh-modal-id-text">{droneId}</span>
                 {latest?.threat && (
                   <span style={{ fontSize:7.5, fontWeight:800, padding:'2px 8px', borderRadius:4,
                                  background:`${tc}1e`, color:tc, border:`1px solid ${tc}40`, letterSpacing:'0.05em' }}>
@@ -114,23 +116,23 @@ export default function DroneHistoryPanel({ droneId, allEvents, onClose }) {
                   </span>
                 )}
               </div>
-              <div style={{ fontSize:10, color:'#777', fontFamily:'system-ui, -apple-system, sans-serif' }}>{latest?.model ?? 'Unknown Model'}</div>
+              <div className="dh-modal-subtitle">{latest?.model ?? 'Unknown Model'}</div>
             </div>
           </div>
           <button onClick={onClose} className="modal-close-btn">
-            <svg style={{ width: 10, height: 10 }} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            <svg className="dh-modal-close-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
         </div>
 
         {/* ── Body ── */}
-        <div className="no-scrollbar" style={{ padding:'8px 16px 8px', overflowY:'auto', flex:1 }}>
+        <div className="no-scrollbar" className="no-scrollbar dh-modal-body-scroll">
           <div className="drone-modal-grid">
             
             {/* Left Column: Drone Profile Stats & Info */}
             <div className="flex-col-start gap-2">
               {/* Identity */}
               <Divider label="Identity" />
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:7 }}>
+              <div className="dh-grid-2col">
                 <F label="Detections"  value={n}              color="#ffffff" icon={icons.detections} />
                 <F label="Group"       value={latest?.group}  color={gc}      icon={icons.group} />
                 <F label="Subgroup"    value={latest?.subgroup}                icon={icons.subgroup} />
@@ -141,7 +143,7 @@ export default function DroneHistoryPanel({ droneId, allEvents, onClose }) {
 
               {/* Flight */}
               <Divider label="Flight Data" />
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:7 }}>
+              <div className="dh-grid-2col">
                 <F label="Max Height"   value={`${maxHeight} m`}  icon={icons.height} />
                 <F label="Avg Height"   value={`${avgHeight} m`}  icon={icons.height} />
                 <F label="Max Speed"    value={`${maxSpeed} m/s`} icon={icons.speed} />
@@ -150,7 +152,7 @@ export default function DroneHistoryPanel({ droneId, allEvents, onClose }) {
 
               {/* Signal */}
               <Divider label="Signal & Protocol" />
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:7 }}>
+              <div className="dh-grid-2col">
                 <F label="Avg RSSI"     value={`${avgRssi} dBm`} color="#a78bfa" icon={icons.rssi} />
                 <F label="Avg SNR"      value={`${avgSnr} dB`}   color="#c084fc" icon={icons.snr} />
                 <F label="Protocol"     value={protocols || '—'}                 icon={icons.proto} />
@@ -159,7 +161,7 @@ export default function DroneHistoryPanel({ droneId, allEvents, onClose }) {
 
               {/* Location & Direction */}
               <Divider label="Location & Direction" />
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:7 }}>
+              <div className="dh-grid-2col">
                 <F label="Direction"    value={topDir}                            icon={icons.dir} />
                 <F label="Min Distance" value={minDist < 9999 ? `${minDist} m` : '—'} color="#f97316" icon={icons.dist} />
                 <F label="Avg Distance" value={`${avgDist} m`}                    icon={icons.dist} />
@@ -180,7 +182,7 @@ export default function DroneHistoryPanel({ droneId, allEvents, onClose }) {
                       const cnt = detections.filter(d => d.detector_id === id).length;
                       return (
                         <div key={id} className="detector-tag-badge">
-                          {id} <span style={{ opacity: 0.6, marginLeft: 2 }}>×{cnt}</span>
+                          {id} <span className="dh-array-item-count">×{cnt}</span>
                         </div>
                       );
                     })}
@@ -206,18 +208,18 @@ export default function DroneHistoryPanel({ droneId, allEvents, onClose }) {
 
               {/* Time Log */}
               <Divider label="Time Log" />
-              <div style={{ display:'grid', gridTemplateColumns:'1fr', gap:7 }}>
+              <div className="dh-grid-1col">
                 <F label="First Seen" value={firstSeen ? formatDate(firstSeen) : '—'} color="#999" icon={icons.clock} />
                 <F label="Last Seen"  value={lastSeen  ? formatDate(lastSeen)  : '—'} color="#999" icon={icons.clock} />
               </div>
             </div>
             
           </div>
-          <div style={{ height:4 }} />
+          <div className="dh-spacer-4" />
         </div>
 
         {/* ── Footer ── */}
-        <div style={{ padding:'0 16px 12px', flexShrink:0 }}>
+        <div className="dh-modal-footer">
           <button onClick={onClose} className="drone-modal-action-btn">
             Close Profile
           </button>

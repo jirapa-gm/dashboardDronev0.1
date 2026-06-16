@@ -1,4 +1,3 @@
-
 const ic = (path, extra = '') =>
   ({ className = 'w-3.5 h-3.5', stroke = 'currentColor', ...rest }) => (
     <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24"
@@ -33,7 +32,7 @@ export const RestartIcon    = ic(<><polyline points="1 4 1 10 7 10"/><path d="M3
 export const LoopIcon       = ic(<><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></>);
 export const CloseIcon      = ic(<><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></>);
 export const GamepadIcon    = ic(<><rect x="2" y="6" width="20" height="12" rx="2" ry="2"/><line x1="6" y1="12" x2="10" y2="12"/><line x1="8" y1="10" x2="8" y2="14"/><line x1="15" y1="13" x2="15.01" y2="13"/><line x1="18" y1="11" x2="18.01" y2="11"/></>);
-
+export const CheckIcon      = ic(<polyline points="20 6 9 17 4 12"/>);
 
 // ── Sidebar-specific icons ─────────────────────────────────────────────────────
 export const SidebarOpenIcon = () => (

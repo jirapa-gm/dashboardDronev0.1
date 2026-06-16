@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Navbar             from './components/Navbar';
 import Sidebar            from './components/Sidebar';
-import { DetectorSummary, GroupSummary, SubgroupSummary } from './components/Summaries';
+import { DetectorSummary, GroupSummary, SubgroupSummary } from './components/summaries';
 import AnalyticsDashboard from './components/AnalyticsDashboard';
 import TacticalMapView    from './components/TacticalMapView';
 import EventLog           from './components/EventLog';
@@ -9,7 +9,7 @@ import TabBar             from './components/TabBar';
 import Breadcrumb         from './components/Breadcrumb';
 import SwipeHint          from './components/SwipeHint';
 import { useEvents }      from './hooks/useEvents';
-import { useSimulation }  from './hooks/useSimulation';
+import { useSimulation }  from './simulation/useSimulation';
 import { useIsMobile }    from './hooks/useIsMobile';
 import { useSwipe }       from './hooks/useSwipe';
 import { toDateStr }      from './shared/helpers';
@@ -119,7 +119,7 @@ export default function App() {
             )}
           </>}
 
-          {activeTab === 'tactical' && <TacticalMapView events={events} isLoading={isLoading} simContext={simContext} />}
+          {activeTab === 'tactical' && <TacticalMapView events={events} summary={summary} isLoading={isLoading} simContext={simContext} />}
           {activeTab === 'log'      && (
             <EventLog
               events={events} droneStats={droneStats} isLoading={isLoading}

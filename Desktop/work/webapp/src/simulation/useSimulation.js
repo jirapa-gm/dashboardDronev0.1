@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { generateSimulation, getDronePosition } from '../utils/simulationEngine';
+import { generateSimulation, getDronePosition } from './engine';
 import mockData from '../data/Mockdata';
 
 // Extract unique detectors from mockData for simulation

@@ -147,7 +147,6 @@ export default function Sidebar({ events, isLoading, onSearch, defaultStartDate,
     const sg  = group === 'ALL' ? 'ALL' : subgroup;
     const det = sg    === 'ALL' ? 'ALL' : detector;
     setSelectedGroup(g); setSelectedSG(sg); setSelectedDet(det);
-    onSearch({ startDate, endDate, group: g, subgroup: sg, detector: det });
   };
 
   const handleSearch = () =>
