@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useMemo } from 'react';
+import './TacticalMapView.css';
 import { GA, GB } from '../shared/constants';
 import { distColor } from '../shared/helpers';
 import { TargetIcon, AlertIcon, LayersIcon, SignalIcon, PlayIcon, PauseIcon, RestartIcon, LoopIcon, CloseIcon, GamepadIcon } from '../shared/icons';
@@ -180,6 +181,11 @@ export default function TacticalMapView({ events, summary, isLoading, simContext
       window.L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: '&copy; OSM &copy; CARTO', subdomains: 'abcd', maxZoom: 19 }).addTo(map);
       leafletMap.current = map;
       setShowSweep(v => v);
+
+      // Fix for blank map issue caused by CSS loading delay
+      setTimeout(() => {
+        if (leafletMap.current) leafletMap.current.invalidateSize();
+      }, 400);
     });
     return () => { if (leafletMap.current) { leafletMap.current.remove(); leafletMap.current = null; } };
   }, []);

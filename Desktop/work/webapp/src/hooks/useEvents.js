@@ -21,6 +21,15 @@ const fetchEvents = async (isMock, params) => {
   if (!params) return null;
   const { startDate, endDate, group, subgroup, detector, metrics } = params;
 
+  // พิมพ์ Log โชว์ใน Console ว่า Frontend ส่งอะไรไปบ้าง (สำหรับตอนพรีเซนต์)
+  console.log("🚀 [Frontend -> Backend] Requesting data with params:", {
+    startDate,
+    endDate,
+    group: group || 'ALL',
+    subgroup: subgroup || 'ALL',
+    detector: detector || 'ALL'
+  });
+
   // ── MOCK mode ────────────────────────────────────────────────────────────
   if (isMock) {
     await new Promise(res => setTimeout(res, 200));

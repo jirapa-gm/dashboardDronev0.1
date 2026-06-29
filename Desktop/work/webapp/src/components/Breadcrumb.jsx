@@ -1,3 +1,5 @@
+import './Minors.css';
+
 export default function Breadcrumb({ activeGroup, activeSubgroup, activeDetector, onReset, onResetToGroup }) {
   const showDetector = activeDetector !== 'ALL';
   const showSubgroup = !showDetector && activeSubgroup !== 'ALL';

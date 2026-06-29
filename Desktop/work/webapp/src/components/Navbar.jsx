@@ -14,8 +14,7 @@ export default function Navbar({ isMockMode, setIsMockMode, sidebarVisible, setS
             <DroneIcon style={{ width: '1rem', height: '1rem', color: '#fff' }} stroke="white" />
           </div>
           <div>
-            <span className="nav-title">DroneSentinel</span>
-            <span className="nav-subtitle">Detection Dashboard</span>
+            <span className="nav-title">DroneDetector</span>
           </div>
         </div>
       </div>

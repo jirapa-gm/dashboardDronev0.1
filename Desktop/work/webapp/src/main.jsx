@@ -3,6 +3,9 @@ import { createRoot } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap/dist/js/bootstrap.bundle.min.js';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css'; // <-- เพิ่มบรรทัดนี้ เพื่อแก้ปัญหาแผนที่ดำ/พัง
+window.L = L;
 import './index.css'
 import App from './App.jsx'
 import { initRipple } from './hooks/useRipple.js'

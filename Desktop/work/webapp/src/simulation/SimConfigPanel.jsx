@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import './SimConfigPanel.css';
 import { GamepadIcon, PlayIcon, CloseIcon } from '../shared/icons';
 
 export default function SimConfigPanel({ onStart, detectorCount, onClose }) {

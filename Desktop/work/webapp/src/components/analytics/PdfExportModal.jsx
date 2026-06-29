@@ -10,9 +10,9 @@ const ALL_SECTIONS = [
 ];
 
 const DETAIL_LEVELS = [
-  { id: 'group',    Icon: GridIcon,   label: 'Group',    sub: 'Totals only' },
-  { id: 'subgroup', Icon: TargetIcon, label: 'Subgroup', sub: 'Per-subgroup' },
-  { id: 'detector', Icon: CompassIcon,label: 'Detector', sub: 'With lat/lon' },
+  { id: 'group',    Icon: GridIcon,   label: 'Basic Overview' },
+  { id: 'subgroup', Icon: TargetIcon, label: 'Zone Breakdown'},
+  { id: 'detector', Icon: CompassIcon,label: 'Full Details' },
 ];
 
 function CheckIcon() {
@@ -69,7 +69,7 @@ export function PdfExportModal({ onClose, onExport, groupFilter, isLoading }) {
 
           {/* Detail Level */}
           <div>
-            <div className="pdf-section-label">Detail Level</div>
+            <div className="pdf-section-label">Report Format</div>
             <div className="pdf-detail-row">
               {DETAIL_LEVELS.map(d => (
                 <button
